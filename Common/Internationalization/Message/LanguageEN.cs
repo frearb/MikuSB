@@ -224,10 +224,10 @@ public class GiveAllTextEN
                           "Note: -1 means all";
     public string Usage => "Usage: /giveall weapon <detail/-1> -p<particular> -l<level>\n" +
                            "Usage: /giveall weaponskin <detail/-1> -p<particular>\n" +
-                           "Usage: /giveall card <detail/-1> -p<particular> -l<level>" +
-                           "Usage: /giveall profile <detail/-1> -g<genre> -p<particular> -l<level>" +
-                           "Usage: /giveall skinpart <detail/-1> -g<genre> -p<particular> -l<level>" +
-                           "Usage: /giveall weaponpart <detail/-1> -g<genre> -p<particular> -l<level>" +
+                           "Usage: /giveall card <detail/-1> -p<particular> -l<level>\n" +
+                           "Usage: /giveall profile <detail/-1> -g<genre> -p<particular> -l<level>\n" +
+                           "Usage: /giveall skinpart <detail/-1> -g<genre> -p<particular> -l<level>\n" +
+                           "Usage: /giveall weaponpart <detail/-1> -g<genre> -p<particular> -l<level>\n" +
                            "Usage: /giveall call <detail/-1> -g<genre> -p<particular> -l<level>";
     public string NotFound => "{0} not found!";
     public string GiveAllItems => "Added {0} {1} to player!";

@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using MikuSB.GameServer.Server.CallGS.Handlers.Boss;
+using MikuSB.Proto;
 
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Chapter;
 
@@ -10,17 +12,30 @@ public class Chapter_DealLevelSettlement : ICallGSHandler
     public async Task Handle(Connection connection, string param, ushort seqNo)
     {
         var req = JsonSerializer.Deserialize<DealLevelSettlementParam>(param);
+        var sync = default(NtfSyncPlayer);
         var response = new JsonObject
         {
             ["sCmd"] = req?.SCmd ?? "Chapter_LevelSettlement",
-            ["tbParam"] = BuildSettlementPayload(req?.SCmd, req?.TbParam)
+            ["tbParam"] = BuildSettlementPayload(connection, req?.SCmd, req?.TbParam, out sync)
         };
 
-        await CallGSRouter.SendScript(connection, "Chapter_DealLevelSettlement", response.ToJsonString());
+        if (sync != null)
+        {
+            await BossPvpLogicState.SendStrAttrsAsync(connection);
+        }
+
+        await CallGSRouter.SendScript(connection, "Chapter_DealLevelSettlement", response.ToJsonString(), sync!);
     }
 
-    private static JsonNode BuildSettlementPayload(string? sCmd, JsonNode? tbParam)
+    private static JsonNode BuildSettlementPayload(Connection connection, string? sCmd, JsonNode? tbParam, out NtfSyncPlayer? sync)
     {
+        sync = null;
+        if (string.Equals(sCmd, "BossPvpLogic_LevelSettlement", StringComparison.Ordinal) ||
+            string.Equals(sCmd, "BossPvpLogic_LevelFail", StringComparison.Ordinal))
+        {
+            return BossPvpLogicState.HandleReconnectSettlement(connection.Player!, sCmd, tbParam, out sync);
+        }
+
         if (string.Equals(sCmd, "Chapter_LevelSettlement", StringComparison.Ordinal))
         {
             return new JsonArray();

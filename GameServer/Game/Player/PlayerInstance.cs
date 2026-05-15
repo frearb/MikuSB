@@ -323,6 +323,13 @@ public class PlayerInstance(PlayerGameData data)
             Data.Attrs.Add(newAttr);
             existingAttrs[(gid, sid)] = newAttr;
         }
+
+        Data.StrAttrs.Add(new PlayerStrAttr
+        {
+            Gid = 51,
+            Sid = 1,
+            Val = "400"
+        });
     }
 
     private static IEnumerable<(uint Gid, uint Sid, uint Value)> BuildGirlFurnitureAttrs()
