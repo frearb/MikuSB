@@ -7,7 +7,7 @@ public class BossPvpLogic_EnterLevel : ICallGSHandler
 {
     public async Task Handle(Connection connection, string param, ushort seqNo)
     {
-        var response = BossPvpService.HandleEnterLevel(param);
+        var response = BossPvpService.HandleEnterLevel(connection.Player!, param);
         await CallGSRouter.SendScript(connection, "BossPvpLogic_EnterLevel", System.Text.Json.JsonSerializer.Serialize(response));
     }
 }

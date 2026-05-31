@@ -3,6 +3,7 @@ using MikuSB.Data.Excel;
 using MikuSB.Database.Inventory;
 using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
+using MikuSB.Util;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -21,6 +22,8 @@ internal static class BossPvpService
     private const uint BossLineup1 = 15;
     private const uint BossLineup2 = 16;
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<(int Uid, uint BossLevelId), uint> ActiveChallengeLineups = [];
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -33,6 +36,8 @@ internal static class BossPvpService
         var sync = new NtfSyncPlayer();
         var season = GetOpenSeason();
         var seasonId = season?.ID ?? 1u;
+        var startTime = season == null ? -1L : ParseBossTime(season.StartTime)?.ToUnixTimeSeconds() ?? -1L;
+        var endTime = season == null ? -1L : ParseBossTime(season.EndTime)?.ToUnixTimeSeconds() ?? -1L;
 
         SetStr(player, ActivitySubId, seasonId.ToString(CultureInfo.InvariantCulture), sync);
         SetStr(player, ChallengeNumSid, GetDailyChallengeNum().ToString(CultureInfo.InvariantCulture), sync);
@@ -57,22 +62,26 @@ internal static class BossPvpService
         var response = new
         {
             nID = seasonId,
-            tbTimeCfg = new[]
-            {
+            tbTimeCfg = Enumerable.Repeat(
                 new
                 {
-                    nStartTime = -1,
-                    nEndTime = -1
-                }
-            }
+                    nStartTime = startTime,
+                    nEndTime = endTime
+                },
+                (int)seasonId).ToArray()
         };
 
         return (response, sync);
     }
 
-    public static object HandleEnterLevel(string? param)
+    public static object HandleEnterLevel(PlayerInstance player, string? param)
     {
         var req = Deserialize<EnterLevelParam>(param);
+        if (req != null)
+        {
+            ActiveChallengeLineups[(player.Uid, req.NId)] = ResolveBossLineupId(req.NTeamId);
+        }
+
         return new
         {
             nSeed = Random.Shared.Next(1, int.MaxValue),
@@ -215,7 +224,13 @@ internal static class BossPvpService
 
     private static void WriteBestRun(PlayerInstance player, uint bossLevelId, uint lineupId, double finishTime, int score, NtfSyncPlayer sync)
     {
-        var snapshots = CaptureLineupSnapshots(player, lineupId);
+        var resolvedLineupId = ResolveBossLineupId(lineupId);
+        if (lineupId == 0 && ActiveChallengeLineups.TryGetValue((player.Uid, bossLevelId), out var activeLineupId))
+        {
+            resolvedLineupId = activeLineupId;
+        }
+
+        var snapshots = CaptureLineupSnapshots(player, resolvedLineupId);
         SetStr(player, GetBossSid(bossLevelId, 1), System.Text.Json.JsonSerializer.Serialize(snapshots[0], JsonOptions), sync);
         SetStr(player, GetBossSid(bossLevelId, 2), System.Text.Json.JsonSerializer.Serialize(snapshots[1], JsonOptions), sync);
         SetStr(player, GetBossSid(bossLevelId, 3), System.Text.Json.JsonSerializer.Serialize(snapshots[2], JsonOptions), sync);
@@ -242,6 +257,16 @@ internal static class BossPvpService
             CaptureRoleSnapshot(player, lineup.Member2),
             CaptureRoleSnapshot(player, lineup.Member3)
         ];
+    }
+
+    private static uint ResolveBossLineupId(uint teamId)
+    {
+        return teamId switch
+        {
+            2 => BossLineup2,
+            BossLineup2 => BossLineup2,
+            _ => BossLineup1
+        };
     }
 
     private static BossPvpRoleSnapshot CaptureRoleSnapshot(PlayerInstance player, uint characterGuid)
@@ -365,6 +390,11 @@ internal static class BossPvpService
     private static BossPvpBossChallengeExcel? GetOpenSeason()
     {
         var now = DateTimeOffset.Now;
+        if (ConfigManager.Config.ServerOption.EnableBossPvpDailyRandomBoss)
+        {
+            return GetDailyRandomSeason(now);
+        }
+
         var current = GameData.BossPvpBossChallengeData.Values
             .OrderBy(x => x.ID)
             .FirstOrDefault(x =>
@@ -375,6 +405,25 @@ internal static class BossPvpService
             });
 
         return current ?? GameData.BossPvpBossChallengeData.Values.OrderBy(x => x.ID).FirstOrDefault();
+    }
+
+    private static BossPvpBossChallengeExcel? GetDailyRandomSeason(DateTimeOffset now)
+    {
+        var seasons = GameData.BossPvpBossChallengeData.Values
+            .OrderBy(x => x.ID)
+            .ToArray();
+
+        if (seasons.Length == 0)
+        {
+            return null;
+        }
+
+        var localDate = now.Date;
+        var seed = (localDate.Year * 10000) + (localDate.Month * 100) + localDate.Day;
+        var current = seasons[new Random(seed).Next(seasons.Length-1) + 1];
+        current.StartTime = FormatBossTime(localDate);
+        current.EndTime = FormatBossTime(localDate.AddDays(1).AddMinutes(-1));
+        return current;
     }
 
     private static uint GetDailyChallengeNum()
@@ -442,9 +491,15 @@ internal static class BossPvpService
         return new DateTimeOffset(localTime);
     }
 
+    private static string FormatBossTime(DateTime value)
+    {
+        return $"[{value.ToString("yyyyMMddHHmm", CultureInfo.InvariantCulture)}]";
+    }
+
     private sealed class EnterLevelParam
     {
         [JsonPropertyName("nID")] public uint NId { get; set; }
+        [JsonPropertyName("nTeamID")] public uint NTeamId { get; set; }
     }
 
     private sealed class RecordParam

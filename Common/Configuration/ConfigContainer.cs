@@ -63,6 +63,7 @@ public class ServerOption
     public ServerProfile ServerProfile { get; set; } = new();
     public bool EnableGmMenu { get; set; } = false;
     public bool AutoCreateUser { get; set; } = true;
+    public bool EnableBossPvpDailyRandomBoss { get; set; } = false;
     public bool SavePersonalDebugFile { get; set; } = false;
     public bool AutoSendResponseWhenNoHandler { get; set; } = true;
 #if DEBUG

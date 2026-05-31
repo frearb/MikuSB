@@ -32,6 +32,7 @@
       "Uid": 80
     },
     "AutoCreateUser": true,
+    "EnableBossPvpDailyRandomBoss": false,
     "SavePersonalDebugFile": false,
     "AutoSendResponseWhenNoHandler": true,
     "EnableDebug": true,
