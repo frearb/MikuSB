@@ -1,3 +1,4 @@
+using MikuSB.Data;
 using MikuSB.Database.Inventory;
 
 namespace MikuSB.GameServer.Game.Support;
@@ -66,5 +67,34 @@ public static class SupportAffixStateService
     {
         if (!HasAffix(card, PendingInitialAffixSlot))
             card.AffixId = 0;
+    }
+
+    public static bool EnsureAffixesMatchLevel(GameSupportCardInfo card)
+    {
+        var excel = GameData.SupportCardData.FirstOrDefault(x => x.TemplateId == card.TemplateId);
+        if (excel == null)
+            return false;
+
+        var targetSlots = card.Level >= excel.MaxLevel ? excel.TotalAffixCount : excel.InitialAffixCount;
+        targetSlots = Math.Min(targetSlots, Math.Min(excel.AffixPool.Count, ActiveThirdAffixSlot));
+
+        var changed = false;
+        for (var slot = 1; slot <= targetSlots; slot++)
+        {
+            if (HasAffix(card, slot))
+                continue;
+
+            var poolId = excel.AffixPool[slot - 1];
+            var (affixId, tier) = SupportAffixService.GenerateRandomAffix(poolId);
+            if (affixId == 0 || tier == 0)
+                continue;
+
+            SetAffix(card, slot, affixId, tier);
+            changed = true;
+        }
+
+        var oldAffixId = card.AffixId;
+        NormalizePendingState(card);
+        return changed || oldAffixId != card.AffixId;
     }
 }

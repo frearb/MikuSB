@@ -3,6 +3,7 @@ using MikuSB.Database;
 using MikuSB.Database.Account;
 using MikuSB.Database.Player;
 using MikuSB.GameServer.Game.Player;
+using MikuSB.GameServer.Game.Support;
 using MikuSB.GameServer.Server.CallGS;
 using MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 using MikuSB.GameServer.Server.Packet.Send.Friend;
@@ -80,6 +81,7 @@ public class HandlerReqLogin : Handler
         connection.DebugFile = Path.Combine(ConfigManager.Config.Path.LogPath, "Debug/", $"{account.Uid}/",
             $"Debug-{DateTime.Now:yyyy-MM-dd HH-mm-ss}.log");
         await connection.Player.OnEnterGame();
+        RepairSupportCardAffixesOnLogin(connection.Player);
         connection.Player.Connection = connection;
         var splitSupportCards = connection.Player.InventoryManager.InventoryData.SupportCards.Count > SupportCardLoginSplitThreshold;
         await connection.SendPacket(new PacketRspLogin(connection.Player!, !splitSupportCards));
@@ -92,6 +94,17 @@ public class HandlerReqLogin : Handler
         await connection.SendPacket(new PacketNtfUpdateFriend(connection.Player!));
         ApplySavedGirlSkinTypes(connection.Player!);
         await SendGirlSkinTypeOnLogin(connection);
+    }
+
+    private static void RepairSupportCardAffixesOnLogin(PlayerInstance player)
+    {
+        var inventoryData = player.InventoryManager.InventoryData;
+        var changed = false;
+        foreach (var supportCard in inventoryData.SupportCards.Values)
+            changed |= SupportAffixStateService.EnsureAffixesMatchLevel(supportCard);
+
+        if (changed)
+            DatabaseHelper.SaveDatabaseType(inventoryData);
     }
 
     private static async Task SendSupportCardsOnLogin(Connection connection)
