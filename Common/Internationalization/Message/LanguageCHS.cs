@@ -263,12 +263,12 @@ public class GiveAllTextCHS
 {
     public string Desc => "给予玩家所有物品\n" +
                           "注意：-1 表示全部";
-    public string Usage => "用法：/giveall weapon <detail/-1> -p<特定> -l<等級>\n" +
+    public string Usage => "用法：/giveall weapon <detail/-1> -p<特定> -l<等级> [-i] [-c]\n" +
                            "用法：/giveall weaponskin <detail/-1> -p<特定>\n" +
-                           "用法：/giveall card <detail/-1> -p<特定> -l<等級>" +
-                           "用法：/giveall profile <detail/-1> -g<类型> -p<特定> -l<等级>" +
-                           "用法：/giveall skinpart <detail/-1> -g<類型> -p<特定> -l<等級>" +
-                           "用法：/giveall weaponpart <detail/-1> -g<類型> -p<特定> -l<等級>" +
+                           "用法：/giveall card <detail/-1> -p<特定> -l<等级> [-i] [-c]\n" +
+                           "用法：/giveall profile <detail/-1> -g<类型> -p<特定> -l<等级>\n" +
+                           "用法：/giveall skinpart <detail/-1> -g<類型> -p<特定> -l<等級>\n" +
+                           "用法：/giveall weaponpart <detail/-1> -g<類型> -p<特定> -l<等級>\n" +
                            "用法：/giveall call <detail/-1> -g<類型> -p<特定> -l<等級>";
     public string NotFound => "未找到 {0}！";
     public string GiveAllItems => "已向玩家添加 {0} 个 {1}！";

@@ -40,6 +40,21 @@ public class PacketNtfCallScript : BasePacket
         SetData(proto);
     }
 
+    public PacketNtfCallScript(List<Item> items) : base(CmdIds.NtfScript)
+    {
+        var proto = new NtfCallScript
+        {
+            Api = "",
+            Arg = "{}",
+            ExtraSync = new NtfSyncPlayer
+            {
+                Items = { items }
+            }
+        };
+
+        SetData(proto);
+    }
+
     public PacketNtfCallScript(List<BaseGameItemInfo> items) : base(CmdIds.NtfScript)
     {
         var proto = new NtfCallScript
@@ -133,7 +148,7 @@ public class PacketNtfCallScript : BasePacket
         SetData(proto);
     }
 
-    private static Item ToSupportCardProto(GameSupportCardInfo card)
+    public static Item ToSupportCardProto(GameSupportCardInfo card)
     {
         SupportAffixStateService.NormalizePendingState(card);
         var proto = card.ToProto();
