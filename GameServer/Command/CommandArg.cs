@@ -39,13 +39,27 @@ public class CommandArg
 
     public async ValueTask<int?> GetOption(char pre, string def = "1")
     {
-        var opStr = Args.FirstOrDefault(x => x[0] == pre)?[1..] ?? def;
+        var opStr = Args.FirstOrDefault(x => x.Length > 0 && x[0] == pre)?[1..] ??
+                    Attributes.FirstOrDefault(x => x.Length > 0 && x[0] == pre)?[1..] ??
+                    def;
         if (!int.TryParse(opStr, out var op))
         {
             await SendMsg(I18NManager.Translate("Game.Command.Notice.InvalidArguments"));
             return null;
         }
         return op;
+    }
+
+    public async ValueTask<bool?> GetSwitch(char pre)
+    {
+        var opStr = Args.FirstOrDefault(x => x.Length > 0 && x[0] == pre)?[1..] ??
+                    Attributes.FirstOrDefault(x => x.Length > 0 && x[0] == pre)?[1..];
+        if (opStr == null) return false;
+        if (opStr.Length == 0) return true;
+        if (int.TryParse(opStr, out var op)) return op != 0;
+
+        await SendMsg(I18NManager.Translate("Game.Command.Notice.InvalidArguments"));
+        return null;
     }
 
     public async ValueTask<bool> CheckArgCnt(int start, int? end = null)

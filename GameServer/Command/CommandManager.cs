@@ -52,7 +52,13 @@ public class CommandManager
                 switch (arg[0])
                 {
                     case '-':
+                        if (int.TryParse(arg, out _))
+                        {
+                            break;
+                        }
+
                         argInfo.Attributes.Add(arg[1..]);
+                        argInfo.Args.Remove(arg);
                         break;
                     case '@':
                         _ = int.TryParse(arg[1..], out target);
