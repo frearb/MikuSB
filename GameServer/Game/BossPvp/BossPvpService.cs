@@ -101,7 +101,7 @@ internal static class BossPvpService
         if (req.BRecord)
         {
             var historyScore = ReadInt(player, GetBossSid(req.NId, 4));
-            var currentScore = ComputeIntegral(req.NId, req.NDiff, req.ResidueTime);
+            var currentScore = ComputeIntegral(req.NId, req.NDiff, NormalizeResidueTime(req.ResidueTime));
             if (currentScore >= historyScore)
             {
                 WriteBestRun(player, req.NId, req.NTeamId, req.NTime, currentScore, sync);
@@ -137,7 +137,7 @@ internal static class BossPvpService
             SetStr(player, positionSid.Value, newPositionDiff.ToString(CultureInfo.InvariantCulture), sync);
         }
 
-        var score = ComputeIntegral(req.NId, req.NDiff, req.ResidueTime);
+        var score = ComputeIntegral(req.NId, req.NDiff, NormalizeResidueTime(req.ResidueTime));
         if (score > ReadInt(player, GetBossSid(req.NId, 4)))
         {
             WriteBestRun(player, req.NId, req.NTeamId, req.NTime, score, sync);
@@ -375,6 +375,9 @@ internal static class BossPvpService
         return (int)Math.Floor(total + 0.5);
     }
 
+    private static int NormalizeResidueTime(double residueTime) =>
+        (int)Math.Max(0, Math.Round(residueTime, MidpointRounding.AwayFromZero));
+
     private static uint? TryGetPositionDiffSid(uint bossLevelId)
     {
         var season = GetOpenSeason();
@@ -507,7 +510,7 @@ internal static class BossPvpService
         [JsonPropertyName("nID")] public uint NId { get; set; }
         [JsonPropertyName("nDiff")] public int NDiff { get; set; }
         [JsonPropertyName("nTime")] public double NTime { get; set; }
-        [JsonPropertyName("ResidueTime")] public int ResidueTime { get; set; }
+        [JsonPropertyName("ResidueTime")] public double ResidueTime { get; set; }
         [JsonPropertyName("bRecord")] public bool BRecord { get; set; }
         [JsonPropertyName("nTeamID")] public uint NTeamId { get; set; }
     }
@@ -517,7 +520,7 @@ internal static class BossPvpService
         [JsonPropertyName("nID")] public uint NId { get; set; }
         [JsonPropertyName("nDiff")] public int NDiff { get; set; }
         [JsonPropertyName("nTime")] public double NTime { get; set; }
-        [JsonPropertyName("ResidueTime")] public int ResidueTime { get; set; }
+        [JsonPropertyName("ResidueTime")] public double ResidueTime { get; set; }
         [JsonPropertyName("nTeamID")] public uint NTeamId { get; set; }
     }
 
