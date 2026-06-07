@@ -87,6 +87,8 @@ dotnet build
 - [Naruse](https://github.com/DevilProMT)
 - [Kei-Luna](https://github.com/Kei-Luna)
 
+## ライセンス
+このリポジトリは [MIT License](LICENSE) の下で公開されています。
 
 ## 利用上の注意
 本ソフトウェアはローカル環境での研究・検証用途を想定しています。  

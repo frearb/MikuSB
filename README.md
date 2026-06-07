@@ -87,6 +87,9 @@ dotnet build
 - [Naruse](https://github.com/DevilProMT)
 - [Kei-Luna](https://github.com/Kei-Luna)
 
+## License
+This repository is licensed under the [MIT License](LICENSE).
+
 ## Notes on use
 This software is intended for research and testing purposes in a local environment.  
 It is not intended for unauthorized access to, interference with, or commercial use of official services.
