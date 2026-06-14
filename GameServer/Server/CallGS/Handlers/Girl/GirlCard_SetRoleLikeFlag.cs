@@ -1,4 +1,5 @@
-﻿using MikuSB.Enums.Item;
+﻿using MikuSB.Database;
+using MikuSB.Enums.Item;
 using MikuSB.Proto;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -18,8 +19,11 @@ public class GirlCard_SetRoleLikeFlag : ICallGSHandler
         if (cardData == null) return;
 
         cardData.Flag = girlData.Flag == 1
-            ? ItemFlagEnum.FLAG_ROLE_LIKE
+            ? ItemFlagEnum.FLAG_ROLE_LIKE | ItemFlagEnum.FLAG_READED
             : ItemFlagEnum.FLAG_READED;
+
+        DatabaseHelper.SaveDatabaseType(player.CharacterManager.CharacterData);
+        await player.OnHeartBeat();
 
         var sync = new NtfSyncPlayer
         {
