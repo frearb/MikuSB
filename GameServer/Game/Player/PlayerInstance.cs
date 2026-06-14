@@ -602,11 +602,221 @@ public class PlayerInstance(PlayerGameData data)
                 yield return (26, goods.GoodsId, goods.LimitTimes);
         }
 
+        foreach (var (sid, value) in BuildCompletedFirstRechargeAttrs())
+            yield return (50, sid, value);
+
+        foreach (var (gid, sid, value) in BuildCompletedBeginnerSevenDayAttrs())
+            yield return (gid, sid, value);
+
+        foreach (var (gid, sid, value) in BuildCompletedNamedBeginnerActivityAttrs())
+            yield return (gid, sid, value);
+
         for (uint favor = 0; favor <= 50; favor++)
             yield return (101, favor * 50, 500);
 
         // Main Scene 0 mean default scene
         yield return (132, 1, 0);
+    }
+
+    private static IEnumerable<(uint Sid, uint Value)> BuildCompletedFirstRechargeAttrs()
+    {
+        const uint activityIdStep = 10;
+        const uint activityFlagPos = 1;
+        const uint firstRechargeAwardDiyPos = 3;
+        var path = Path.Combine(ConfigManager.Config.Path.ResourcePath, "activity", "activities.json");
+        if (!File.Exists(path))
+            yield break;
+
+        if (JsonNode.Parse(File.ReadAllText(path)) is not JsonArray rows)
+            yield break;
+
+        foreach (var row in rows.OfType<JsonObject>())
+        {
+            if (!string.Equals(ReadJsonString(row["Class"]), "first_recharge", StringComparison.Ordinal))
+                continue;
+
+            var activityId = ReadJsonUInt(row["Id"]);
+            if (activityId == 0)
+                continue;
+
+            // Bit 0 = red point read, bit 1 = new flag read.
+            yield return (activityId * activityIdStep + activityFlagPos, 3);
+            // Activity.GetDiyData(activityId, 1) maps to activityId * 10 + 3.
+            yield return (activityId * activityIdStep + firstRechargeAwardDiyPos, 1);
+        }
+    }
+
+    private static IEnumerable<(uint Gid, uint Sid, uint Value)> BuildCompletedBeginnerSevenDayAttrs()
+    {
+        const uint activityGroupId = 50;
+        const uint achievementQuestGroupId = 7;
+        const uint activityIdStep = 10;
+        const uint activityFlagPos = 1;
+        const uint sevenDayUnlockDayDiyPos = 3;
+        const uint sevenDayIndexAwardDiyPos = 4;
+
+        foreach (var activityId in LoadBeginnerSevenDayActivityIds())
+        {
+            var maxDay = LoadSevenDayMaxDay(activityId);
+            var indexAwardMask = LoadSevenDayIndexAwardMask(activityId);
+
+            yield return (activityGroupId, activityId * activityIdStep + activityFlagPos, 3);
+            yield return (activityGroupId, activityId * activityIdStep + sevenDayUnlockDayDiyPos, maxDay);
+            yield return (activityGroupId, activityId * activityIdStep + sevenDayIndexAwardDiyPos, indexAwardMask);
+
+            foreach (var achievementId in LoadSevenDayAchievementIds(activityId))
+                yield return (achievementQuestGroupId, achievementId, uint.MaxValue);
+        }
+    }
+
+    private static IEnumerable<(uint Gid, uint Sid, uint Value)> BuildCompletedNamedBeginnerActivityAttrs()
+    {
+        const uint activityGroupId = 50;
+        const uint achievementQuestGroupId = 7;
+        const uint activityIdStep = 10;
+        const uint activityFlagPos = 1;
+        const uint activityDiyPos1 = 3;
+        var completedTitles = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "activity.Lable13",
+            "activity.MianStoryTarget_name",
+            "ui.PlayerExp_BuffTitle2"
+        };
+
+        foreach (var row in LoadActivityRows())
+        {
+            if (ReadJsonUInt(row["BeginnerActivities"]) == 0)
+                continue;
+
+            if (!completedTitles.Contains(ReadJsonString(row["TitleDes"])))
+                continue;
+
+            var activityId = ReadJsonUInt(row["Id"]);
+            if (activityId == 0)
+                continue;
+
+            yield return (activityGroupId, activityId * activityIdStep + activityFlagPos, 3);
+
+            var activityClass = ReadJsonString(row["Class"]);
+            if (string.Equals(activityClass, "diy_ssr", StringComparison.Ordinal))
+            {
+                yield return (activityGroupId, activityId * activityIdStep + activityDiyPos1, 1);
+            }
+            else if (string.Equals(activityClass, "activity_quest", StringComparison.Ordinal))
+            {
+                foreach (var questId in ReadActivityQuestIds(row))
+                    yield return (achievementQuestGroupId, questId, uint.MaxValue);
+            }
+        }
+    }
+
+    private static IEnumerable<uint> LoadBeginnerSevenDayActivityIds()
+    {
+        foreach (var row in LoadActivityRows())
+        {
+            if (!string.Equals(ReadJsonString(row["Class"]), "seven_day", StringComparison.Ordinal))
+                continue;
+
+            if (ReadJsonUInt(row["BeginnerActivities"]) == 0)
+                continue;
+
+            var activityId = ReadJsonUInt(row["Id"]);
+            if (activityId != 0)
+                yield return activityId;
+        }
+    }
+
+    private static IEnumerable<uint> ReadActivityQuestIds(JsonObject row)
+    {
+        foreach (var questId in ReadJsonUIntArray(row["Daily"]))
+            yield return questId;
+
+        foreach (var questId in ReadJsonUIntArray(row["Weekly"]))
+            yield return questId;
+
+        foreach (var questId in ReadJsonUIntArray(row["Normal"]))
+            yield return questId;
+    }
+
+    private static IEnumerable<JsonObject> LoadActivityRows()
+    {
+        var path = Path.Combine(ConfigManager.Config.Path.ResourcePath, "activity", "activities.json");
+        if (!File.Exists(path))
+            yield break;
+
+        if (JsonNode.Parse(File.ReadAllText(path)) is not JsonArray rows)
+            yield break;
+
+        foreach (var row in rows.OfType<JsonObject>())
+            yield return row;
+    }
+
+    private static uint LoadSevenDayMaxDay(uint activityId)
+    {
+        var path = Path.Combine(ConfigManager.Config.Path.ResourcePath, "activity", "seven_day", "seven_day_achievements.json");
+        if (!File.Exists(path))
+            return 0;
+
+        if (JsonNode.Parse(File.ReadAllText(path)) is not JsonArray rows)
+            return 0;
+
+        uint maxDay = 0;
+        foreach (var row in rows.OfType<JsonObject>())
+        {
+            if (ReadJsonUInt(row["ActId"]) == activityId)
+                maxDay = Math.Max(maxDay, ReadJsonUInt(row["DayId"]));
+        }
+
+        return maxDay;
+    }
+
+    private static uint LoadSevenDayIndexAwardMask(uint activityId)
+    {
+        var path = Path.Combine(ConfigManager.Config.Path.ResourcePath, "activity", "seven_day", "seven_day_awards.json");
+        if (!File.Exists(path))
+            return 0;
+
+        if (JsonNode.Parse(File.ReadAllText(path)) is not JsonArray rows)
+            return 0;
+
+        uint mask = 0;
+        foreach (var row in rows.OfType<JsonObject>())
+        {
+            if (ReadJsonUInt(row["ActId"]) != activityId)
+                continue;
+
+            var awardId = ReadJsonUInt(row["AwardId"]);
+            if (awardId is > 0 and < 32)
+                mask |= 1u << (int)awardId;
+        }
+
+        return mask;
+    }
+
+    private static IEnumerable<uint> LoadSevenDayAchievementIds(uint activityId)
+    {
+        var path = Path.Combine(ConfigManager.Config.Path.ResourcePath, "activity", "seven_day", "seven_day_achievements.json");
+        if (!File.Exists(path))
+            yield break;
+
+        if (JsonNode.Parse(File.ReadAllText(path)) is not JsonArray rows)
+            yield break;
+
+        foreach (var row in rows.OfType<JsonObject>())
+        {
+            if (ReadJsonUInt(row["ActId"]) != activityId)
+                continue;
+
+            if (row["AchieveId"] is not JsonArray achievements)
+                continue;
+
+            foreach (var node in achievements)
+            {
+                var achievementId = ReadJsonUInt(node);
+                if (achievementId != 0)
+                    yield return achievementId;
+            }
+        }
     }
 
     private static IEnumerable<(uint Gid, uint Sid, string Value)> BuildShopBootstrapStrAttrs()
@@ -649,6 +859,27 @@ public class PlayerInstance(PlayerGameData data)
         }
 
         return 0;
+    }
+
+    private static string ReadJsonString(JsonNode? node)
+    {
+        if (node is JsonValue value && value.TryGetValue<string>(out var stringValue))
+            return stringValue;
+
+        return "";
+    }
+
+    private static IEnumerable<uint> ReadJsonUIntArray(JsonNode? node)
+    {
+        if (node is not JsonArray array)
+            yield break;
+
+        foreach (var item in array)
+        {
+            var value = ReadJsonUInt(item);
+            if (value != 0)
+                yield return value;
+        }
     }
 
     private static string BuildShopDataJson(uint shopId, uint version, uint listVersion)
