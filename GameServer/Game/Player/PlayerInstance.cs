@@ -109,6 +109,8 @@ public class PlayerInstance(PlayerGameData data)
         if (!Initialized) await InitialPlayerManager();
         Data.EnsureDisplayName();
         await CharacterManager.RepairCharacterWeapons();
+        await EnsureSkins();
+        EnsureFashionRikiUnlocks();
         await EnsureSupplies();
     }
 
@@ -120,6 +122,51 @@ public class PlayerInstance(PlayerGameData data)
         foreach (var supplies in GameData.AllSuppliesData)
         {
             await InventoryManager.AddSuppliesItem(supplies, 90000, false);
+        }
+    }
+
+    private async ValueTask EnsureSkins()
+    {
+        foreach (var skinCard in GameData.CardSkinData.Values)
+        {
+            await InventoryManager.AddSkinItem(
+                (ItemTypeEnum)skinCard.Genre,
+                skinCard.Detail,
+                skinCard.Particular,
+                skinCard.Level,
+                false);
+        }
+    }
+
+    private void EnsureFashionRikiUnlocks()
+    {
+        const uint rikiGroupId = 103;
+        var ownedSkinTemplateIds = InventoryManager.InventoryData.Skins.Values
+            .Select(x => x.TemplateId)
+            .ToHashSet();
+
+        var rikiAttrs = Data.Attrs
+            .Where(x => x.Gid == rikiGroupId)
+            .ToDictionary(x => x.Sid);
+
+        foreach (var rikiId in LoadUnlockedFashionRikiIds(ownedSkinTemplateIds))
+        {
+            var (taskId, bit) = GetRikiTask(rikiId);
+            var flag = 1u << (int)bit;
+            if (rikiAttrs.TryGetValue(taskId, out var attr))
+            {
+                attr.Val |= flag;
+                continue;
+            }
+
+            attr = new PlayerAttr
+            {
+                Gid = rikiGroupId,
+                Sid = taskId,
+                Val = flag
+            };
+            Data.Attrs.Add(attr);
+            rikiAttrs[taskId] = attr;
         }
     }
 
@@ -420,6 +467,61 @@ public class PlayerInstance(PlayerGameData data)
 
         for (uint sid = 30000; sid < 31000; sid++)
             yield return (101, sid, furnitureUnlockedValue);
+    }
+
+    private static IEnumerable<uint> LoadUnlockedFashionRikiIds(IReadOnlySet<ulong> ownedSkinTemplateIds)
+    {
+        const uint fashionType = 5;
+        var path = Path.Combine(ConfigManager.Config.Path.ResourcePath, "riki", "Riki.json");
+        if (!File.Exists(path))
+            yield break;
+
+        if (JsonNode.Parse(File.ReadAllText(path)) is not JsonArray rows)
+            yield break;
+
+        foreach (var row in rows.OfType<JsonObject>())
+        {
+            if (ReadJsonUInt(row["Type"]) != fashionType)
+                continue;
+
+            var rikiId = ReadJsonUInt(row["Id"]);
+            if (rikiId == 0)
+                continue;
+
+            if (ReadRikiConditionTemplateIds(row["Condition"]).Any(ownedSkinTemplateIds.Contains))
+                yield return rikiId;
+        }
+    }
+
+    private static IEnumerable<ulong> ReadRikiConditionTemplateIds(JsonNode? node)
+    {
+        if (node is not JsonArray array)
+            yield break;
+
+        if (array.Count >= 4 && array.Take(4).All(x => x is JsonValue))
+        {
+            var genre = ReadJsonUInt(array[0]);
+            var detail = ReadJsonUInt(array[1]);
+            var particular = ReadJsonUInt(array[2]);
+            var level = ReadJsonUInt(array[3]);
+            if (genre != 0 && detail != 0 && particular != 0 && level != 0)
+                yield return GameResourceTemplateId.FromGdpl(genre, detail, particular, level);
+        }
+
+        foreach (var child in array)
+        {
+            foreach (var templateId in ReadRikiConditionTemplateIds(child))
+                yield return templateId;
+        }
+    }
+
+    private static (uint TaskId, uint Bit) GetRikiTask(uint rikiId)
+    {
+        var index = rikiId / 1000;
+        var value = rikiId % 1000;
+        var taskId = (index - 1) * 30 + ((value + 29) / 30);
+        var bit = value % 30;
+        return (taskId, bit);
     }
 
     private static IEnumerable<(uint Gid, uint Sid, uint Value)> BuildLobbyBootstrapAttrs()

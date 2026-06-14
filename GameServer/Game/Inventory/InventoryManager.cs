@@ -69,7 +69,7 @@ public class InventoryManager(PlayerInstance player) : BasePlayerManager(player)
         var skinData = GameData.CardSkinData.Values.FirstOrDefault(x => x.Genre == (int)genre && x.Detail == detail && x.Particular == particular && x.Level == level);
         if (skinData == null) return null;
         var templateId = GameResourceTemplateId.FromGdpl((uint)genre,detail,particular,level);
-        if (InventoryData.Items.Values.Any(x => x.TemplateId == templateId)) return null;
+        if (InventoryData.Skins.Values.Any(x => x.TemplateId == templateId)) return null;
         var skinInfo = new GameSkinInfo
         {
             TemplateId = templateId,
