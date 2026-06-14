@@ -13,6 +13,7 @@ public class SupportCardExcel : ExcelResource
     public uint Icon { get; set; }
     public uint ProvideExp { get; set; }
     public uint Color { get; set; }
+    public JToken? Close { get; set; }
     [JsonProperty("RecycleID")] public int RecycleID { get; set; }
     [JsonProperty("LevelLimitID")] public int LevelLimitId { get; set; }
     [JsonProperty("AffixPool")] public List<int> AffixPool { get; set; } = [];
@@ -47,8 +48,19 @@ public class SupportCardExcel : ExcelResource
 
     public override void Loaded()
     {
+        if (IsClosed)
+            return;
+
         GameData.SupportCardData.Add(this);
     }
+
+    private bool IsClosed => Close switch
+    {
+        null => false,
+        JValue { Type: JTokenType.Integer } value => value.Value<int>() != 0,
+        JValue { Type: JTokenType.String } value => value.Value<string>() == "1",
+        _ => false
+    };
 
     private static IReadOnlyList<uint> ParseFlatCost(JToken? token)
     {
