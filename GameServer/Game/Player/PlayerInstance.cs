@@ -551,7 +551,7 @@ public class PlayerInstance(PlayerGameData data)
         // Cash.GetMoneyCount uses group 1 with sid = moneyId * 2 + 1 for most currencies.
         // Fill a wide currency id range so every in-game currency starts effectively unlimited.
         for (uint moneyId = 1; moneyId <= 200; moneyId++)
-            yield return (1, moneyId * 2 + 1, 999_999_999);
+            yield return (1, moneyId * 2 + 1, 999_999);
 
         for (uint guideId = 1; guideId <= 150; guideId++)
             yield return (4, guideId, 999);
