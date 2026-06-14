@@ -299,6 +299,7 @@ public class PlayerInstance(PlayerGameData data)
         }
 
         proto.ShowItems.AddRange(Data.ShowItems);
+        proto.ShowAttrs.AddRange(Data.ShowAttrs);
 
         return proto;
     }
@@ -317,6 +318,17 @@ public class PlayerInstance(PlayerGameData data)
             Data.ShowItems.Add(0);
 
         Data.ShowItems[index - 1] = itemId;
+    }
+
+    public void SetShowAttr(int index, uint value)
+    {
+        if (index <= 0)
+            return;
+
+        while (Data.ShowAttrs.Count < index)
+            Data.ShowAttrs.Add(0);
+
+        Data.ShowAttrs[index - 1] = value;
     }
 
     public void SetStrAttr(uint gid, uint sid, string value)

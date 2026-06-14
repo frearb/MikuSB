@@ -20,6 +20,7 @@ public class PlayerGameData : BaseDatabaseDataHelper
     [SugarColumn(IsJson = true)] public List<PlayerAttr> Attrs { get; set; } = [];
     [SugarColumn(IsJson = true)] public List<PlayerStrAttr> StrAttrs { get; set; } = [];
     [SugarColumn(IsJson = true)] public List<ulong> ShowItems { get; set; } = [];
+    [SugarColumn(IsJson = true)] public List<uint> ShowAttrs { get; set; } = [];
 
     public static PlayerGameData? GetPlayerByUid(long uid)
     {
@@ -55,6 +56,7 @@ public class PlayerGameData : BaseDatabaseDataHelper
             Sex = Gender,
             Sign = Signature,
         };
+        proto.ShowAttrs.AddRange(ShowAttrs);
         return proto;
     }
     
