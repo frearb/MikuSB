@@ -14,6 +14,7 @@ using MikuSB.Proto;
 using MikuSB.TcpSharp;
 using MikuSB.Util;
 using MikuSB.Util.Extensions;
+using System.Text.Json.Nodes;
 
 namespace MikuSB.GameServer.Game.Player;
 
@@ -199,6 +200,7 @@ public class PlayerInstance(PlayerGameData data)
     public Proto.Player ToPlayerProto(bool includeSupportCards = true)
     {
         BuildPlayerAttr();
+        BuildPlayerStrAttr();
         var displayName = PlayerGameData.NormalizeDisplayName(Data.Name);
         var proto = new Proto.Player
         {
@@ -318,6 +320,26 @@ public class PlayerInstance(PlayerGameData data)
     private uint GetAttrValue(uint gid, uint sid)
     {
         return Data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid)?.Val ?? 0;
+    }
+
+    private void BuildPlayerStrAttr()
+    {
+        foreach (var (gid, sid, value) in BuildShopBootstrapStrAttrs())
+        {
+            var attr = Data.StrAttrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
+            if (attr != null)
+            {
+                attr.Val = value;
+                continue;
+            }
+
+            Data.StrAttrs.Add(new PlayerStrAttr
+            {
+                Gid = gid,
+                Sid = sid,
+                Val = value
+            });
+        }
     }
 
     public void BuildPlayerAttr(bool additional = false)
@@ -463,11 +485,84 @@ public class PlayerInstance(PlayerGameData data)
             yield return (4, guide.ID, 999);
         }
 
+        // IBLogic uses group 113 to track whether mall goods have been viewed.
+        // Mark every configured mall item as viewed so unimplemented shop content
+        // does not keep the main shop button in a red-dot state.
+        foreach (var goodsId in GameData.IbGoodsData.Keys)
+            yield return (113, goodsId, 1);
+
+        // IBLogic.CheckFreeBox lights the mall button for limited free goods until
+        // BuyGroupId reaches LimitTimes. Treat limited mall goods as exhausted
+        // while the mall feature is not implemented.
+        foreach (var goods in GameData.IbGoodsData.Values)
+        {
+            if (goods.LimitTimes > 0)
+                yield return (26, goods.GoodsId, goods.LimitTimes);
+        }
+
         for (uint favor = 0; favor <= 50; favor++)
             yield return (101, favor * 50, 500);
 
         // Main Scene 0 mean default scene
         yield return (132, 1, 0);
+    }
+
+    private static IEnumerable<(uint Gid, uint Sid, string Value)> BuildShopBootstrapStrAttrs()
+    {
+        foreach (var (shopId, version, listVersion) in LoadShopTabVersions())
+            yield return (1, shopId, BuildShopDataJson(shopId, version, listVersion));
+    }
+
+    private static IEnumerable<(uint ShopId, uint Version, uint ListVersion)> LoadShopTabVersions()
+    {
+        var path = Path.Combine(ConfigManager.Config.Path.ResourcePath, "shop", "shop_tab.json");
+        if (!File.Exists(path))
+            yield break;
+
+        if (JsonNode.Parse(File.ReadAllText(path)) is not JsonArray rows)
+            yield break;
+
+        foreach (var row in rows.OfType<JsonObject>())
+        {
+            var shopId = ReadJsonUInt(row["ShopId"]);
+            if (shopId == 0)
+                continue;
+
+            yield return (shopId, ReadJsonUInt(row["Version"]), ReadJsonUInt(row["ListVersion"]));
+        }
+    }
+
+    private static uint ReadJsonUInt(JsonNode? node)
+    {
+        if (node == null)
+            return 0;
+
+        if (node is JsonValue value)
+        {
+            if (value.TryGetValue<uint>(out var uintValue))
+                return uintValue;
+
+            if (value.TryGetValue<string>(out var stringValue) && uint.TryParse(stringValue, out var parsed))
+                return parsed;
+        }
+
+        return 0;
+    }
+
+    private static string BuildShopDataJson(uint shopId, uint version, uint listVersion)
+    {
+        var data = new JsonObject
+        {
+            ["shopid"] = shopId,
+            ["version"] = version,
+            ["listversion"] = listVersion,
+            ["refreshnum"] = 0,
+            ["displaynum"] = 0,
+            ["refreshtime"] = 0,
+            ["tbgoods"] = new JsonArray()
+        };
+
+        return data.ToJsonString();
     }
     #endregion
 }
