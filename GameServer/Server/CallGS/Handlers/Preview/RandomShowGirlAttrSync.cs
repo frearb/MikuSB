@@ -13,7 +13,7 @@ internal static class RandomShowGirlAttrSync
 
         foreach (var attr in oldAttrs)
         {
-            AddSync(player, sync, gid, attr.Sid, 0);
+            player.Attributes.SyncTo(sync, gid, attr.Sid, 0);
         }
 
         player.Data.Attrs.RemoveAll(x => x.Gid == gid && x.Sid >= startSid && x.Sid <= endSid);
@@ -44,12 +44,6 @@ internal static class RandomShowGirlAttrSync
         }
 
         attr.Val = value;
-        AddSync(player, sync, gid, sid, value);
-    }
-
-    private static void AddSync(Game.Player.PlayerInstance player, NtfSyncPlayer sync, uint gid, uint sid, uint value)
-    {
-        sync.Custom[player.ToPackedAttrKey(gid, sid)] = value;
-        sync.Custom[player.ToShiftedAttrKey(gid, sid)] = value;
+        player.Attributes.SyncTo(sync, gid, sid, value);
     }
 }

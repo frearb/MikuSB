@@ -57,7 +57,7 @@ public class GirlSkin_RandomChange : ICallGSHandler
         {
             Items = { changedCards.Select(x => x.ToProto()) }
         };
-        sync.CustomStr[player.ToShiftedAttrKey(FashionGroupId, RandomChangeRecordSid)] = recordJson;
+        player.Attributes.SyncTo(sync, new Database.Player.PlayerStrAttr { Gid = FashionGroupId, Sid = RandomChangeRecordSid, Val = recordJson });
 
         await CallGSRouter.SendScript(connection, "GirlSkin_RandomChange", "{}", sync);
     }
@@ -142,7 +142,7 @@ public class GirlSkin_ResetRandomChange : ICallGSHandler
         {
             Items = { changedCards.Select(x => x.ToProto()) }
         };
-        sync.CustomStr[player.ToShiftedAttrKey(FashionGroupId, RandomChangeRecordSid)] = "";
+        player.Attributes.SyncTo(sync, new Database.Player.PlayerStrAttr { Gid = FashionGroupId, Sid = RandomChangeRecordSid, Val = "" });
 
         await CallGSRouter.SendScript(connection, "GirlSkin_ResetRandomChange", "{}", sync);
     }

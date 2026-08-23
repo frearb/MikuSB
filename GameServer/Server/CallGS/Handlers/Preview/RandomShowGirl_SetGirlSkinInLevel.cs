@@ -1,5 +1,6 @@
 using MikuSB.Database.Player;
 using MikuSB.Proto;
+using SqlSugar;
 using System.Text.Json;
 
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Preview;
@@ -23,7 +24,7 @@ public class RandomShowGirl_SetGirlSkinInLevel : ICallGSHandler
 
         foreach (var attr in oldAttrs)
         {
-            AddSync(player, sync, attr.Sid, 0);
+            player.Attributes.SyncTo(sync, GroupId, attr.Sid, 0);
         }
 
         player.Data.Attrs.RemoveAll(x => x.Gid == GroupId && x.Sid >= SkinInLevelStartSid && x.Sid <= SkinInLevelEndSid);
@@ -37,16 +38,10 @@ public class RandomShowGirl_SetGirlSkinInLevel : ICallGSHandler
                 Sid = sid,
                 Val = skinId
             });
-            AddSync(player, sync, sid, skinId);
+            player.Attributes.SyncTo(sync, GroupId, sid, skinId);
             sid++;
         }
 
         await CallGSRouter.SendScript(connection, "RandomShowGirl_SetGirlSkinInLevel", "{}", sync);
-    }
-
-    private static void AddSync(Game.Player.PlayerInstance player, NtfSyncPlayer sync, uint sid, uint value)
-    {
-        sync.Custom[player.ToPackedAttrKey(GroupId, sid)] = value;
-        sync.Custom[player.ToShiftedAttrKey(GroupId, sid)] = value;
     }
 }

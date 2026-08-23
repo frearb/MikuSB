@@ -21,7 +21,6 @@ public class GirlCard_SetRoleLikeFlag : CallGSHandler<SetRoleLikeFlagParam>
             : ItemFlagEnum.FLAG_READED;
 
         DatabaseHelper.SaveDatabaseType(player.CharacterManager.CharacterData);
-        await player.OnHeartBeat();
 
         var sync = new NtfSyncPlayer
         {
