@@ -62,6 +62,21 @@ public class CommandGiveAll : ICommands
         }
 
         if (syncItems.Count > 0) await player.SendPacket(new PacketNtfCallScript(syncItems));
+        {
+            var weapon = await player.InventoryManager!.AddWeaponItem(ItemTypeEnum.TYPE_WEAPON, (uint)detail,(uint)particular,1,(uint)level,false);
+            if (weapon == null)
+            {
+                await arg.SendMsg(I18NManager.Translate("Game.Command.GiveAll.NotFound", I18NManager.Translate("Word.Weapon")));
+                return;
+            }
+            weapons.Add(weapon);
+        }
+        if (weapons.Count > 0)
+        {
+            await player.SendPacket(new PacketNtfCallScript(weapons));
+            await player.SendPacket(new PacketNtfCallScript(player));
+            DatabaseHelper.SaveDatabaseType(player.Data);
+        }
         DatabaseHelper.SaveDatabaseType(player.InventoryManager.InventoryData);
         await arg.SendMsg(I18NManager.Translate("Game.Command.GiveAll.GiveAllItems",
             I18NManager.Translate("Word.Weapon"), weapons.Count.ToString()));
@@ -337,7 +352,12 @@ public class CommandGiveAll : ICommands
             }
             skinItems.Add(skin);
         }
-        if (skinItems.Count > 0) await player.SendPacket(new PacketNtfCallScript(skinItems));
+        if (skinItems.Count > 0)
+        {
+            await player.SendPacket(new PacketNtfCallScript(skinItems));
+            await player.SendPacket(new PacketNtfCallScript(player));
+            DatabaseHelper.SaveDatabaseType(player.Data);
+        }
         DatabaseHelper.SaveDatabaseType(player.InventoryManager.InventoryData);
         await arg.SendMsg(I18NManager.Translate("Game.Command.GiveAll.GiveAllItems",
             I18NManager.Translate("Word.Skin"), skinItems.Count.ToString()));

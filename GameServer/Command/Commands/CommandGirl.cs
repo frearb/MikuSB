@@ -1,4 +1,5 @@
 ﻿using MikuSB.Data;
+using MikuSB.Database;
 using MikuSB.Database.Character;
 using MikuSB.Enums.Item;
 using MikuSB.Enums.Player;
@@ -43,7 +44,13 @@ public class CommandGirl : ICommands
             }
             girls.Add(girl);
         }
-        if (girls.Count > 0) await player.SendPacket(new PacketNtfCallScript(girls));
+        if (girls.Count > 0)
+        {
+            await player.SendPacket(new PacketNtfCallScript(girls));
+            await player.SendPacket(new PacketNtfCallScript(player));
+            DatabaseHelper.SaveDatabaseType(player.Data);
+            DatabaseHelper.SaveDatabaseType(player.CharacterManager.CharacterData);
+        }
         await arg.SendMsg(I18NManager.Translate("Game.Command.Girl.Added", girls.Count.ToString()));
     }
 

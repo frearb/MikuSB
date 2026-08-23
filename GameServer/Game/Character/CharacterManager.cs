@@ -28,6 +28,8 @@ public class CharacterManager(PlayerInstance player) : BasePlayerManager(player)
             Timestamp = Extensions.GetUnixSec()
         };
 
+        Player.RikiManager.UnlockItem(genre, detail, particular, level);
+
         var weaponInfo = await Player.InventoryManager!.AddWeaponItem((ItemTypeEnum)CharacterExcel.DefaultWeaponGPDL[0], CharacterExcel.DefaultWeaponGPDL[1], CharacterExcel.DefaultWeaponGPDL[2], CharacterExcel.DefaultWeaponGPDL[3],sendPacket: true);
         if (weaponInfo != null) character.WeaponUniqueId = weaponInfo.UniqueId;
 

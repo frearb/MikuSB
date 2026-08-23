@@ -12,6 +12,7 @@ using MikuSB.GameServer.Game.Inventory;
 using MikuSB.GameServer.Game.Lineup;
 using MikuSB.GameServer.Game.Quest;
 using MikuSB.GameServer.Game.Reward;
+using MikuSB.GameServer.Game.Riki;
 using MikuSB.GameServer.Game.Rogue3D;
 using MikuSB.GameServer.Server;
 using MikuSB.Proto;
@@ -43,6 +44,7 @@ public class PlayerInstance(PlayerGameData data)
     public LineupManager LineupManager { get; set; } = null!;
     public QuestManager QuestManager { get; set; } = null!;
     public RewardManager RewardManager { get; set; } = null!;
+    public RikiManager RikiManager { get; set; } = null!;
     public Rogue3DManager Rogue3DManager { get; set; } = null!;
 
     private QuestLevelType ActiveLevelType { get; set; }
@@ -107,6 +109,7 @@ public class PlayerInstance(PlayerGameData data)
         CharacterManager = new CharacterManager(this);
         QuestManager = new QuestManager(this);
         RewardManager = new RewardManager(this);
+        RikiManager = new RikiManager(this);
         Rogue3DManager = new Rogue3DManager(this);
 
         await Task.CompletedTask;
@@ -441,6 +444,7 @@ public class PlayerInstance(PlayerGameData data)
     {
         QuestManager.MigrateChapterStarAwardMasks();
         QuestManager.RemoveLegacyLevelUnlocks();
+        RikiManager.EnsureOwnedItemsUnlocked();
 
         var bootstrapAttrs = BuildLobbyBootstrapAttrs().ToList();
         if (additional) bootstrapAttrs.AddRange(BuildGirlFurnitureAttrs());
