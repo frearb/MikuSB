@@ -13,11 +13,17 @@ public static class GameData
     public static Dictionary<int, BreakLevelLimitExcel> BreakLevelLimitData { get; private set; } = [];
     public static Dictionary<int, RecycleExcel> RecycleData { get; private set; } = [];
     public static Dictionary<uint, ChapterLevelExcel> ChapterLevelData { get; private set; } = [];
+    public static Dictionary<ulong, ChapterExcel> ChapterData { get; private set; } = [];
     public static Dictionary<uint, RoleLevelExcel> RoleLevelData { get; private set; } = [];
+    public static Dictionary<uint, PlayerLevelExcel> PlayerLevelData { get; private set; } = [];
+    public static Dictionary<uint, DropExcel> DropData { get; private set; } = [];
+    public static Dictionary<uint, DropGroupExcel> DropGroupData { get; private set; } = [];
     public static Dictionary<uint, ArItemExcel> ArItemData { get; private set; } = [];
     public static Dictionary<uint, ManifestationExcel> ManifestationData { get; private set; } = [];
     public static Dictionary<uint, Rogue3DDifficultExcel> Rogue3DDifficultData { get; private set; } = [];
     public static Dictionary<uint, Rogue3DSeasonExcel> Rogue3DSeasonData { get; private set; } = [];
+    public static Dictionary<uint, Rogue3DScienceExcel> Rogue3DScienceData { get; private set; } = [];
+    public static Dictionary<uint, Rogue3DScienceLevelExcel> Rogue3DScienceLevelData { get; private set; } = [];
     public static Dictionary<uint, Rogue3DTalentExcel> Rogue3DTalentData { get; private set; } = [];
     public static Dictionary<uint, Rogue3DDailyBuffExcel> Rogue3DDailyBuffData { get; private set; } = [];
     public static Dictionary<int, BreakExcel> BreakData { get; private set; } = [];
@@ -39,7 +45,7 @@ public static class GameData
     public static Dictionary<uint, ClimbTowerLevelOrderExcel> ClimbTowerLevelOrderData { get; private set; } = [];
     public static Dictionary<uint, TowerLevelExcel> TowerLevelData { get; private set; } = [];
     public static Dictionary<uint, TowerEventLevelExcel> TowerEventLevelData { get; private set; } = [];
-    public static Dictionary<uint, OtherItemExcel> OtherItemData { get; private set; } = [];
+    public static Dictionary<ulong, OtherItemExcel> OtherItemData { get; private set; } = [];
     public static Dictionary<uint, ProfileExcel> ProfileData { get; private set; } = [];
     public static Dictionary<uint, CardSkinPartsExcel> CardSkinPartsData { get; private set; } = [];
     public static Dictionary<uint, CallItemExcel> CallItemData { get; private set; } = [];

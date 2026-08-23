@@ -6,9 +6,9 @@ using System.Text.Json.Nodes;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.DreamCard;
 
 [CallGSApi("DreamCard_CheckOpen")]
-public class DreamCard_CheckOpen : ICallGSHandler
+public class DreamCard_CheckOpen : CallGSHandler
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
         var now = DateTime.Now;
         var ids = GameData.DreamCardActivityData.Values
@@ -22,7 +22,7 @@ public class DreamCard_CheckOpen : ICallGSHandler
             ["tbID"] = new JsonArray(ids)
         };
 
-        await CallGSRouter.SendScript(connection, "DreamCard_CheckOpen", response.ToJsonString());
+        return Task.FromResult(CallGSResult.Ok(response.ToJsonString()));
     }
 
     private static bool IsOpen(DreamCardActivityExcel config, DateTime now)

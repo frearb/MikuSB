@@ -4,11 +4,11 @@ namespace MikuSB.GameServer.Server.CallGS.Handlers.Rogue3D;
 // param: {"nModeID": int}
 // Response: {} on success, {"sErr": "key"} on failure
 [CallGSApi("Rogue3D_SelectMode")]
-public class Rogue3D_SelectMode : ICallGSHandler
+public class Rogue3D_SelectMode : CallGSHandler
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
-        var sync = Rogue3DStateHelper.EnsureUnlockState(connection.Player!);
-        await CallGSRouter.SendScript(connection, "Rogue3D_SelectMode", "{}", sync);
+        var sync = context.Player.Rogue3DManager.EnsureUnlockState();
+        return Task.FromResult(CallGSResult.Ok("{}", sync));
     }
 }

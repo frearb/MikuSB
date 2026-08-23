@@ -5,31 +5,29 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Tower;
 
 [CallGSApi("TowerLevel_EnterLevel")]
-public class TowerLevel_EnterLevel : ICallGSHandler
+public class TowerLevel_EnterLevel : CallGSHandler<TowerLevelEnterLevelParam>
 {
     private static readonly Random Random = new();
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, TowerLevelEnterLevelParam req)
     {
-        var req = JsonSerializer.Deserialize<TowerLevelEnterLevelParam>(param);
+
         if (req == null || req.LevelId == 0 || req.TeamId <= 0)
         {
-            await CallGSRouter.SendScript(connection, "TowerLevel_EnterLevel", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         if (!GameData.TowerLevelData.ContainsKey((uint)req.LevelId))
         {
-            await CallGSRouter.SendScript(connection, "TowerLevel_EnterLevel", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var rsp = $"{{\"nSeed\":{Random.Next(1, 1_000_000_000)}}}";
-        await CallGSRouter.SendScript(connection, "TowerLevel_EnterLevel", rsp);
+        return Task.FromResult(CallGSResult.Ok(rsp));
     }
 }
 
-internal sealed class TowerLevelEnterLevelParam
+public sealed class TowerLevelEnterLevelParam
 {
     [JsonPropertyName("nID")]
     public int LevelId { get; set; }

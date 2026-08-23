@@ -1,5 +1,6 @@
 using Google.Protobuf;
 using MikuSB.Data;
+using MikuSB.Data.Excel;
 using MikuSB.Database;
 using MikuSB.Database.Account;
 using MikuSB.Database.Inventory;
@@ -9,6 +10,9 @@ using MikuSB.GameServer.Command;
 using MikuSB.GameServer.Game.Character;
 using MikuSB.GameServer.Game.Inventory;
 using MikuSB.GameServer.Game.Lineup;
+using MikuSB.GameServer.Game.Quest;
+using MikuSB.GameServer.Game.Reward;
+using MikuSB.GameServer.Game.Rogue3D;
 using MikuSB.GameServer.Server;
 using MikuSB.Proto;
 using MikuSB.TcpSharp;
@@ -32,10 +36,19 @@ public class PlayerInstance(PlayerGameData data)
 
     #region Data & Manager
 
-    public PlayerGameData Data { get; set; } = data;
+    public PlayerGameData Data { get; } = data;
+    public PlayerAttributes Attributes { get; } = new(data);
     public CharacterManager CharacterManager { get; set; } = null!;
     public InventoryManager InventoryManager { get; set; } = null!;
     public LineupManager LineupManager { get; set; } = null!;
+    public QuestManager QuestManager { get; set; } = null!;
+    public RewardManager RewardManager { get; set; } = null!;
+    public Rogue3DManager Rogue3DManager { get; set; } = null!;
+
+    private QuestLevelType ActiveLevelType { get; set; }
+    private uint ActiveLevelId { get; set; }
+    private uint ActiveLevelSeed { get; set; }
+    public uint ActiveLevelTeamId { get; private set; }
 
     #endregion
 
@@ -92,6 +105,9 @@ public class PlayerInstance(PlayerGameData data)
         InventoryManager = new InventoryManager(this);
         LineupManager = new LineupManager(this);
         CharacterManager = new CharacterManager(this);
+        QuestManager = new QuestManager(this);
+        RewardManager = new RewardManager(this);
+        Rogue3DManager = new Rogue3DManager(this);
 
         await Task.CompletedTask;
     }
@@ -258,6 +274,7 @@ public class PlayerInstance(PlayerGameData data)
             Subchannel = "gm",
             Name = displayName,
             Level = Data.Level,
+            Exp = (uint)Math.Max(0, Data.Exp),
             Sex = Data.Gender,
             Vigor = Data.Vigor,
             Solutions = { LineupManager.LineupData.LineupInfo.Values.Select(x => x.ToProto()) },
@@ -272,26 +289,10 @@ public class PlayerInstance(PlayerGameData data)
         {
             foreach (var card in InventoryManager.InventoryData.SupportCards.Values) proto.Items.Add(card.ToProto());
         }
-        foreach (var x in Data.Attrs)
-        {
-            uint gid = x.Gid;
-            uint sid = x.Sid;
-            uint val = x.Val;
+        Attributes.SyncTo(proto);
 
-            if (gid == 0)
-            {
-                proto.Attrs[sid] = val;
-                continue;
-            }
-
-            proto.Attrs[ToPackedAttrKey(gid, sid)] = val;   
-            proto.Attrs[ToShiftedAttrKey(gid, sid)] = val;
-        }
-
-        foreach (var x in Data.StrAttrs)
-        {
-            proto.StrAttrs[ToShiftedAttrKey(x.Gid, x.Sid)] = x.Val;
-        }
+        foreach (var attr in Attributes.AllStrings)
+            Attributes.SyncTo(proto, attr);
 
         foreach (var (key, value) in BuildMoneySync())
         {
@@ -333,39 +334,14 @@ public class PlayerInstance(PlayerGameData data)
 
     public void SetStrAttr(uint gid, uint sid, string value)
     {
-        var attr = Data.StrAttrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
-        if (attr == null)
-        {
-            attr = new PlayerStrAttr
-            {
-                Gid = gid,
-                Sid = sid
-            };
-            Data.StrAttrs.Add(attr);
-        }
-
-        attr.Val = value;
-    }
-
-    public uint ToPackedAttrKey(uint gid, uint sid)
-    {
-        if (gid == 0)
-            return sid;
-
-        return (gid * 10000) + sid;
-    }
-
-    public uint ToShiftedAttrKey(uint gid, uint sid)
-    {
-        if (gid == 0)
-            return sid;
-
-        return (gid << 16) | sid;
+        Attributes.SetString(gid, sid, value);
     }
 
     public Dictionary<string, int> BuildMoneySync()
     {
-        var currentMoney = (int)Math.Min(int.MaxValue, GetAttrValue(1, 3));
+        var currentMoney = (int)Math.Min(
+            int.MaxValue,
+            GetAttrValue(AttrIds.Currency.GroupId, AttrIds.Currency.GetSid(AttrIds.Currency.Money)));
         var sync = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
         {
             ["."] = currentMoney,
@@ -376,9 +352,69 @@ public class PlayerInstance(PlayerGameData data)
         return sync;
     }
 
+    public void BeginLevelSession(QuestLevelType levelType, uint levelId, uint seed, uint teamId = 0)
+    {
+        ActiveLevelType = levelType;
+        ActiveLevelId = levelId;
+        ActiveLevelSeed = seed;
+        ActiveLevelTeamId = teamId;
+    }
+
+    public bool IsLevelSession(QuestLevelType levelType, uint levelId, uint seed) =>
+        ActiveLevelType == levelType && ActiveLevelId == levelId && ActiveLevelSeed == seed;
+
+    public IReadOnlyList<PlayerLevelExcel> AddPlayerExperience(uint amount, NtfSyncPlayer sync)
+    {
+        if (amount == 0)
+            return [];
+
+        if (Data.Level == 0)
+            Data.Level = 1;
+
+        var leveledUp = new List<PlayerLevelExcel>();
+        var totalExp = (ulong)Math.Max(0, Data.Exp) + amount;
+        while (GameData.PlayerLevelData.TryGetValue(Data.Level, out var currentLevel) &&
+               currentLevel.MaxExp > 0 &&
+               totalExp >= currentLevel.MaxExp &&
+               GameData.PlayerLevelData.ContainsKey(Data.Level + 1))
+        {
+            totalExp -= currentLevel.MaxExp;
+            Data.Level++;
+            if (GameData.PlayerLevelData.TryGetValue(Data.Level, out var newLevel))
+                leveledUp.Add(newLevel);
+        }
+
+        Data.Exp = (int)Math.Min(int.MaxValue, totalExp);
+        sync.Core[(uint)PlayerCoreAttribute.Level] = Data.Level;
+        sync.Core[(uint)PlayerCoreAttribute.Exp] = (uint)Data.Exp;
+        return leveledUp;
+    }
+
+    public void AddCurrency(uint moneyType, uint amount, NtfSyncPlayer sync)
+    {
+        if (amount == 0)
+            return;
+
+        if (moneyType == AttrIds.Currency.Vigor)
+        {
+            Data.Vigor = Math.Min(uint.MaxValue - Data.Vigor, amount) + Data.Vigor;
+            sync.Core[(uint)PlayerCoreAttribute.Vigor] = Data.Vigor;
+            return;
+        }
+
+        var sid = AttrIds.Currency.GetSid(moneyType);
+        var attr = Attributes.Add(AttrIds.Currency.GroupId, sid, amount);
+        Attributes.SyncTo(sync, attr);
+        if (moneyType == AttrIds.Currency.Money)
+        {
+            foreach (var (key, value) in BuildMoneySync())
+                sync.Money[key] = value;
+        }
+    }
+
     private uint GetAttrValue(uint gid, uint sid)
     {
-        return Data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid)?.Val ?? 0;
+        return Attributes.GetValue(gid, sid);
     }
 
     private void BuildPlayerStrAttr()
@@ -403,10 +439,11 @@ public class PlayerInstance(PlayerGameData data)
 
     public void BuildPlayerAttr(bool additional = false)
     {
+        QuestManager.MigrateChapterStarAwardMasks();
+        QuestManager.RemoveLegacyLevelUnlocks();
+
         var bootstrapAttrs = BuildLobbyBootstrapAttrs().ToList();
         if (additional) bootstrapAttrs.AddRange(BuildGirlFurnitureAttrs());
-        var existingAttrs = Data.Attrs
-            .ToDictionary(x => (x.Gid, x.Sid));
         var seenAttrs = new HashSet<(uint Gid, uint Sid)>();
 
         foreach (var (gid, sid, value) in bootstrapAttrs)
@@ -414,7 +451,8 @@ public class PlayerInstance(PlayerGameData data)
             if (!seenAttrs.Add((gid, sid)))
                 continue;
 
-            if (existingAttrs.TryGetValue((gid, sid), out var attr))
+            var attr = Attributes.Get(gid, sid);
+            if (attr != null)
             {
                 if (attr.Val < value)
                     attr.Val = value;
@@ -422,15 +460,7 @@ public class PlayerInstance(PlayerGameData data)
                 continue;
             }
 
-            var newAttr = new PlayerAttr
-            {
-                Gid = gid,
-                Sid = sid,
-                Val = value
-            };
-
-            Data.Attrs.Add(newAttr);
-            existingAttrs[(gid, sid)] = newAttr;
+            Attributes.Set(gid, sid, value);
         }
     }
 
@@ -571,28 +601,6 @@ public class PlayerInstance(PlayerGameData data)
         // Additional guide ids referenced directly by the Lua scripts and observed client logs.
         foreach (var guideId in new uint[] { 10_031, 10_041, 10_061, 10_081, 10_101, 10_224, 11_006, 11_202, 11_210, 22_002 })
             yield return (4, guideId, 999);
-
-        // Launch.GPASSID = 22 stores pass counts. ChapterLevel.GID = 21 stores star flags.
-        // Unlock every level defined in level.json so all chapters are accessible from the start.
-        foreach (var levelId in GameData.ChapterLevelData.Keys)
-        {
-            yield return (21, levelId, 7);
-            yield return (22, levelId, 1_700_000_000);
-        }
-
-        foreach (var levelId in GameData.DailyLevelData.Keys)
-        {
-            yield return (21, levelId, 7);
-            yield return (22, levelId, 1_700_000_000);
-        }
-
-        // Role fragment chapters use Condition.PRE_LEVEL against Launch.GPASSID as well.
-        // Mark every role level as cleared so character-specific stages beyond the first one unlock.
-        foreach (var levelId in GameData.RoleLevelData.Keys)
-        {
-            yield return (21, levelId, 7);
-            yield return (22, levelId, 1_700_000_000);
-        }
 
         foreach (var guide in GameData.GuideData.Values)
         {

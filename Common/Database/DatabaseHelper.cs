@@ -1,5 +1,6 @@
 ﻿﻿using MikuSB.Database.Account;
 using MikuSB.Internationalization;
+using MikuSB.Database.Player;
 using MikuSB.Util;
 using SqlSugar;
 using System.Collections.Concurrent;
@@ -18,6 +19,8 @@ public class DatabaseHelper
     private static int _saving = 0;
     private static Task? _saveTask;
     private static CancellationTokenSource? _cts;
+    private const string CompleteAllQuestColumn = nameof(PlayerGameData.CompleteAllQuestLevels);
+    private static bool? completeAllQuestColumnExists;
     public static bool LoadAccount;
     public static bool LoadAllData;
 
@@ -340,5 +343,47 @@ public class DatabaseHelper
         {
             logger.Error("An error occurred while saving the database", e);
         }
+    }
+
+    public static bool LoadCompleteAllQuestLevels(int uid)
+    {
+        if (sqlSugarScope == null || !HasCompleteAllQuestColumn())
+            return false;
+
+        return sqlSugarScope.Ado
+            .SqlQuery<int>($"SELECT COALESCE(\"{CompleteAllQuestColumn}\", 0) FROM \"Player\" WHERE \"Uid\" = @Uid",
+                new SugarParameter("@Uid", uid))
+            .FirstOrDefault() != 0;
+    }
+
+    public static void SaveCompleteAllQuestLevels(PlayerGameData player)
+    {
+        if (sqlSugarScope == null)
+            return;
+
+        var hasColumn = HasCompleteAllQuestColumn();
+        if (!hasColumn && !player.CompleteAllQuestLevels)
+            return;
+
+        if (!hasColumn)
+        {
+            sqlSugarScope.Ado.ExecuteCommand(
+                $"ALTER TABLE \"Player\" ADD COLUMN \"{CompleteAllQuestColumn}\" INTEGER NOT NULL DEFAULT 0");
+            completeAllQuestColumnExists = true;
+        }
+
+        sqlSugarScope.Ado.ExecuteCommand(
+            $"UPDATE \"Player\" SET \"{CompleteAllQuestColumn}\" = @Value WHERE \"Uid\" = @Uid",
+            new SugarParameter("@Value", player.CompleteAllQuestLevels ? 1 : 0),
+            new SugarParameter("@Uid", player.Uid));
+    }
+
+    private static bool HasCompleteAllQuestColumn()
+    {
+        if (completeAllQuestColumnExists.HasValue)
+            return completeAllQuestColumnExists.Value;
+
+        completeAllQuestColumnExists = sqlSugarScope!.DbMaintenance.IsAnyColumn("Player", CompleteAllQuestColumn);
+        return completeAllQuestColumnExists.Value;
     }
 }

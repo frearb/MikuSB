@@ -1,5 +1,4 @@
 using MikuSB.Database;
-using MikuSB.Database.Player;
 using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using System.Globalization;
@@ -7,12 +6,14 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
+using MikuSB.Data;
+
 namespace MikuSB.GameServer.Server.CallGS.Handlers.DreamCard;
 
 [CallGSApi("DreamCard_LevelSettlement")]
-public class DreamCard_LevelSettlement : ICallGSHandler
+public class DreamCard_LevelSettlement : CallGSHandler
 {
-    private const uint LevelGroupId = 152;
+    private const uint LevelGroupId = AttrIds.DreamCard.LevelGid;
     private const uint LevelSubNum = 10;
     private const int OrdinaryType = 1;
     private const int ChallengeType = 2;
@@ -20,10 +21,10 @@ public class DreamCard_LevelSettlement : ICallGSHandler
 
     private static readonly Lazy<DreamCardSettlementIndex?> SettlementIndex = new(LoadIndex);
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
-        var (response, sync) = HandleSettlement(connection.Player!, JsonNode.Parse(param));
-        await CallGSRouter.SendScript(connection, "DreamCard_LevelSettlement", response.ToJsonString(), sync);
+        var (response, sync) = HandleSettlement(context.Connection.Player!, JsonNode.Parse(param));
+        return Task.FromResult(CallGSResult.Ok(response.ToJsonString(), sync));
     }
 
     public static (JsonObject Response, NtfSyncPlayer Sync) HandleSettlement(PlayerInstance player, JsonNode? tbParam)
@@ -61,17 +62,17 @@ public class DreamCard_LevelSettlement : ICallGSHandler
     {
         var baseSid = (uint)(LevelSubNum * req.LevelId);
 
-        var passAttr = GetOrCreateAttr(player.Data, LevelGroupId, baseSid + 1);
+        var passAttr = player.Attributes.GetOrCreate(LevelGroupId, baseSid + 1);
         passAttr.Val += 1;
-        SyncAttr(sync, player, passAttr);
+        player.Attributes.SyncTo(sync, passAttr);
 
-        var diffAttr = GetOrCreateAttr(player.Data, LevelGroupId, baseSid + 2);
+        var diffAttr = player.Attributes.GetOrCreate(LevelGroupId, baseSid + 2);
         diffAttr.Val = Math.Max(diffAttr.Val, (uint)req.Diff);
-        SyncAttr(sync, player, diffAttr);
+        player.Attributes.SyncTo(sync, diffAttr);
 
-        var starAttr = GetOrCreateAttr(player.Data, LevelGroupId, baseSid + 3);
+        var starAttr = player.Attributes.GetOrCreate(LevelGroupId, baseSid + 3);
         starAttr.Val = MergeDifficultyBits(starAttr.Val, req.Diff, req.StarValue);
-        SyncAttr(sync, player, starAttr);
+        player.Attributes.SyncTo(sync, starAttr);
 
         if (TryGetOrdinaryRewardId((uint)req.LevelId, (uint)req.Diff, out var rewardId) && rewardId > 0)
             response["nRewardID"] = rewardId;
@@ -83,17 +84,17 @@ public class DreamCard_LevelSettlement : ICallGSHandler
         var scoreSid = baseSid + (uint)req.Diff + 4;
 
         var currentScore = (uint)Math.Max(0, req.Score);
-        var scoreAttr = GetOrCreateAttr(player.Data, LevelGroupId, scoreSid);
+        var scoreAttr = player.Attributes.GetOrCreate(LevelGroupId, scoreSid);
         var newRecord = currentScore > scoreAttr.Val;
         scoreAttr.Val = Math.Max(scoreAttr.Val, currentScore);
-        SyncAttr(sync, player, scoreAttr);
+        player.Attributes.SyncTo(sync, scoreAttr);
 
         var challengePeriodId = ResolveCurrentChallengePeriodId(DateTime.Now);
         if (challengePeriodId > 0)
         {
-            var periodAttr = GetOrCreateAttr(player.Data, LevelGroupId, 0);
+            var periodAttr = player.Attributes.GetOrCreate(LevelGroupId, 0);
             periodAttr.Val = challengePeriodId;
-            SyncAttr(sync, player, periodAttr);
+            player.Attributes.SyncTo(sync, periodAttr);
         }
 
         response["NewRecord"] = newRecord;
@@ -158,26 +159,6 @@ public class DreamCard_LevelSettlement : ICallGSHandler
         return JsonSerializer.Deserialize<T>(File.ReadAllText(path));
     }
 
-    private static PlayerAttr GetOrCreateAttr(PlayerGameData data, uint gid, uint sid)
-    {
-        var attr = data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
-        if (attr != null)
-            return attr;
-
-        attr = new PlayerAttr
-        {
-            Gid = gid,
-            Sid = sid
-        };
-        data.Attrs.Add(attr);
-        return attr;
-    }
-
-    private static void SyncAttr(NtfSyncPlayer sync, PlayerInstance player, PlayerAttr attr)
-    {
-        sync.Custom[player.ToPackedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-        sync.Custom[player.ToShiftedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-    }
 }
 
 internal sealed class DreamCardLevelSettlementParam

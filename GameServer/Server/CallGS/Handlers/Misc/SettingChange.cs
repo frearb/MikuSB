@@ -1,38 +1,39 @@
 using MikuSB.Proto;
-using System.Text.Json;
+using MikuSB.GameServer.Game.Player;
 using System.Text.Json.Serialization;
+
+using MikuSB.Data;
 
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Misc;
 
 [CallGSApi("SettingChange")]
-public class SettingChange : ICallGSHandler
+public class SettingChange : CallGSHandler<List<SettingChangeParam>>
 {
-    private const uint PlayerSettingGid = 44;
+    private const uint PlayerSettingGid = AttrIds.Settings.Gid;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override async Task<CallGSResult> HandleAsync(CallGSContext context, List<SettingChangeParam> changes)
     {
-        var changes = JsonSerializer.Deserialize<List<SettingChangeParam>>(param) ?? [];
-        var player = connection.Player!;
+        var player = context.Player;
         var sync = new NtfSyncPlayer();
 
         foreach (var change in changes)
         {
-            var value = player.Data.StrAttrs
-                .FirstOrDefault(x => x.Gid == PlayerSettingGid && x.Sid == change.Id)?
-                .Val;
+            var value = player.Attributes.GetStringValue(PlayerSettingGid, change.Id);
 
             if (value == null)
                 continue;
 
-            sync.CustomStr[player.ToShiftedAttrKey(PlayerSettingGid, change.Id)] = value;
+            player.Attributes.SyncTo(sync, player.Attributes.GetString(PlayerSettingGid, change.Id)!);
         }
 
         if (sync.CustomStr.Count > 0)
-            await connection.SendPacket(CmdIds.NtfSyncAttr, sync);
+            await context.Connection.SendPacket(CmdIds.NtfSyncAttr, sync);
+
+        return CallGSResult.NoResponse();
     }
 }
 
-internal sealed class SettingChangeParam
+public sealed class SettingChangeParam
 {
     [JsonPropertyName("id")]
     public uint Id { get; set; }

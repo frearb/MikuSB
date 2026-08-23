@@ -11,6 +11,11 @@ public static class GameLaunchService
     public static int Launch(params string[] extraGameArguments)
     {
         ConfigManager.LoadConfig();
+        if (ConfigManager.Config.Loader.EnableInGameConsole
+            && ConfigManager.Config.Loader.AutoUpdateInGameConsole)
+        {
+            InGameConsoleDownloadService.EnsurePresent();
+        }
         PatchDownloadService.EnsurePatchPresent();
         var options = LaunchOptions.FromConfig(extraGameArguments);
         return Launch(options);
@@ -295,7 +300,14 @@ public sealed class LaunchOptions
         var config = ConfigManager.Config;
         var serverBaseDirectory = AppContext.BaseDirectory;
         var gamePath = ResolvePath(config.Loader.GamePath, AppContext.BaseDirectory);
-        var patchPaths = ResolvePatchPaths(config.Loader.PatchPaths, serverBaseDirectory);
+        var configuredPatchPaths = (config.Loader.PatchPaths ?? []).ToList();
+        if (config.Loader.EnableInGameConsole
+            && !configuredPatchPaths.Contains(config.Loader.InGameConsoleLoaderPath, StringComparer.OrdinalIgnoreCase))
+        {
+            configuredPatchPaths.Add(config.Loader.InGameConsoleLoaderPath);
+        }
+
+        var patchPaths = ResolvePatchPaths(configuredPatchPaths, serverBaseDirectory);
         var gameArgs = new List<string>(config.Loader.Arguments ?? []);
         if (extraGameArguments is not null)
             gameArgs.AddRange(extraGameArguments.Where(x => !string.IsNullOrWhiteSpace(x)));

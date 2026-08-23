@@ -126,21 +126,9 @@ public class PacketNtfCallScript : BasePacket
             Arg = "{}"
         };
         var sync = new NtfSyncPlayer();
-        foreach (var x in Player.Data.Attrs)
-        {
-            uint gid = x.Gid;
-            uint sid = x.Sid;
-            uint val = x.Val;
-
-            if (gid == 0)
-            {
-                sync.Custom[sid] = val;
-                continue;
-            }
-
-            sync.Custom[Player.ToPackedAttrKey(gid, sid)] = val;
-            sync.Custom[Player.ToShiftedAttrKey(gid, sid)] = val;
-        }
+        foreach (var attr in Player.Attributes.All)
+            Player.Attributes.SyncTo(sync, attr);
+        Player.QuestManager.SyncTestingStateTo(sync);
         foreach (var (key, value) in Player.BuildMoneySync())
             sync.Money[key] = value;
         proto.ExtraSync = sync;

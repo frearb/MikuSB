@@ -1,8 +1,8 @@
 using MikuSB.Data;
 using MikuSB.Database;
 using MikuSB.Database.Inventory;
-using MikuSB.Database.Player;
 using MikuSB.Enums.Item;
+using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,36 +10,32 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("GirlCard_UpdateLevel")]
-public class GirlCard_UpdateLevel : ICallGSHandler
+public class GirlCard_UpdateLevel : CallGSHandler<GirlCardUpdateLevelParam>
 {
-    private const uint CashGroupId = 1;
-    private const uint SilverMoneyType = 3;
-    private const uint SilverSid = SilverMoneyType * 2 + 1;
+    private const uint CashGroupId = AttrIds.CurrencyGid;
+    private static readonly uint SilverSid = AttrIds.Currency.GetSid(AttrIds.Currency.Silver);
     private const uint RoleMaxLevel = 80;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, GirlCardUpdateLevelParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<GirlCardUpdateLevelParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.Id == 0 || req.Materials == null || req.Materials.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpdateLevel", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var card = player.CharacterManager.GetCharacterByGUID((uint)req.Id);
         if (card == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpdateLevel", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var cardTemplate = GameData.CardData.Values.FirstOrDefault(x =>
             GameResourceTemplateId.FromGdpl(x.Genre, x.Detail, x.Particular, x.Level) == card.TemplateId);
         if (cardTemplate == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpdateLevel", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var levelCap = GetCardLevelCap(player.Data.Level, cardTemplate.LevelLimitID);
@@ -50,8 +46,7 @@ public class GirlCard_UpdateLevel : ICallGSHandler
 
         if (card.Level >= RoleMaxLevel)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpdateLevel", "{\"sErr\":\"tip.card_max_level\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("tip.card_max_level"));
         }
 
         var requestedMaterials = new Dictionary<uint, uint>();
@@ -65,8 +60,7 @@ public class GirlCard_UpdateLevel : ICallGSHandler
 
         if (requestedMaterials.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpdateLevel", "{\"sErr\":\"tip.material_not_enough\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("tip.material_not_enough"));
         }
 
         ulong totalExp = 0;
@@ -76,25 +70,22 @@ public class GirlCard_UpdateLevel : ICallGSHandler
             var item = player.InventoryManager.GetNormalItem(itemId);
             if (item == null || item.ItemCount < count)
             {
-                await CallGSRouter.SendScript(connection, "GirlCard_UpdateLevel", "{\"sErr\":\"tip.material_not_enough\"}");
-                return;
+                return Task.FromResult(CallGSResult.Error("tip.material_not_enough"));
             }
 
             if (!GameData.SuppliesData.TryGetValue((uint)item.TemplateId, out var supplies) || supplies.ProvideExp == 0)
             {
-                await CallGSRouter.SendScript(connection, "GirlCard_UpdateLevel", "{\"sErr\":\"error.BadParam\"}");
-                return;
+                return Task.FromResult(CallGSResult.Error("error.BadParam"));
             }
 
             totalExp += (ulong)supplies.ProvideExp * count;
             totalSilverCost += (ulong)supplies.ConsumeGold * count;
         }
 
-        var silverAttr = GetOrCreateAttr(player.Data, CashGroupId, SilverSid);
+        var silverAttr = player.Attributes.GetOrCreate(CashGroupId, SilverSid);
         if ((ulong)silverAttr.Val < totalSilverCost)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpdateLevel", "{\"sErr\":\"tip.material_not_enough\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("tip.material_not_enough"));
         }
 
         var syncItems = new List<Item>();
@@ -127,26 +118,9 @@ public class GirlCard_UpdateLevel : ICallGSHandler
 
         var sync = new NtfSyncPlayer();
         sync.Items.AddRange(syncItems);
-        sync.Custom[player.ToPackedAttrKey(CashGroupId, SilverSid)] = silverAttr.Val;
-        sync.Custom[player.ToShiftedAttrKey(CashGroupId, SilverSid)] = silverAttr.Val;
+        player.Attributes.SyncTo(sync, silverAttr);
 
-        await CallGSRouter.SendScript(connection, "GirlCard_UpdateLevel", "null", sync);
-    }
-
-    private static PlayerAttr GetOrCreateAttr(PlayerGameData data, uint gid, uint sid)
-    {
-        var attr = data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
-        if (attr != null)
-            return attr;
-
-        attr = new PlayerAttr
-        {
-            Gid = gid,
-            Sid = sid,
-            Val = 0
-        };
-        data.Attrs.Add(attr);
-        return attr;
+        return Task.FromResult(CallGSResult.Ok("null", sync));
     }
 
     private static Item BuildRemovedProto(BaseGameItemInfo item)
@@ -277,7 +251,7 @@ public class GirlCard_UpdateLevel : ICallGSHandler
     }
 }
 
-internal sealed class GirlCardUpdateLevelParam
+public sealed class GirlCardUpdateLevelParam
 {
     [JsonPropertyName("Id")]
     public int Id { get; set; }
@@ -286,7 +260,7 @@ internal sealed class GirlCardUpdateLevelParam
     public List<GirlCardLevelMaterial> Materials { get; set; } = [];
 }
 
-internal sealed class GirlCardLevelMaterial
+public sealed class GirlCardLevelMaterial
 {
     [JsonPropertyName("Id")]
     public int Id { get; set; }

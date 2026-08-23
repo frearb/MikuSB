@@ -4,21 +4,20 @@ using System.Text.Json;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("GirlSkin_Change")]
-public class GirlSkin_Change : ICallGSHandler
+public class GirlSkin_Change : CallGSHandler<ChangeSkinParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, ChangeSkinParam girlSkinData)
     {
-        var player = connection.Player!;
-        var girlSkinData = JsonSerializer.Deserialize<ChangeSkinParam>(param);
-        var cardData = player.CharacterManager.GetCharacterByGUID((uint)girlSkinData!.CardId);
-        if (cardData == null) return;
+        var player = context.Connection.Player!;
 
+        var cardData = player.CharacterManager.GetCharacterByGUID((uint)girlSkinData!.CardId);
+        if (cardData == null) return Task.FromResult(CallGSResult.NoResponse());
         cardData.SkinId = (uint)girlSkinData.Id;
 
         var sync = new NtfSyncPlayer
         {
             Items = { cardData.ToProto() }
         };
-        await CallGSRouter.SendScript(connection, "GirlSkin_Change", "{}", sync);
+        return Task.FromResult(CallGSResult.Ok("{}", sync));
     }
 }

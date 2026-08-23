@@ -2,8 +2,8 @@ using MikuSB.Data;
 using MikuSB.Data.Excel;
 using MikuSB.Database;
 using MikuSB.Database.Inventory;
-using MikuSB.Database.Player;
 using MikuSB.GameServer.Game.Support;
+using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using System.Text.Json.Serialization;
 
@@ -11,22 +11,22 @@ namespace MikuSB.GameServer.Server.CallGS.Handlers.SupporterCard;
 
 internal static class SupporterCardAffixShared
 {
-    public const uint BaseGid = 150;
-    public const uint FixedResetSid = 1;
+    public const uint BaseGid = AttrIds.SupporterCard.Gid;
+    public const uint FixedResetSid = AttrIds.SupporterCard.FixedResetSid;
 
     public static SupportCardExcel? GetExcel(GameSupportCardInfo card)
     {
         return GameData.SupportCardData.FirstOrDefault(x => x.TemplateId == card.TemplateId);
     }
 
-    public static async Task SendResetResponse(Connection connection, NtfSyncPlayer? sync = null)
+    public static CallGSResult ResetResponse(NtfSyncPlayer? sync = null)
     {
-        await CallGSRouter.SendScript(connection, "SupporterCard_ResetAffix", "null", sync!);
+        return CallGSResult.Ok("null", sync, "SupporterCard_ResetAffix");
     }
 
-    public static async Task SendSelectResponse(Connection connection, NtfSyncPlayer? sync = null)
+    public static CallGSResult SelectResponse(NtfSyncPlayer? sync = null)
     {
-        await CallGSRouter.SendScript(connection, "SupporterCard_SelectAffix", "null", sync!);
+        return CallGSResult.Ok("null", sync, "SupporterCard_SelectAffix");
     }
 
     public static List<Item> ConsumeCostItems(Connection connection, IEnumerable<IReadOnlyList<uint>> costs)
@@ -71,24 +71,12 @@ internal static class SupporterCardAffixShared
         });
     }
 
-    public static PlayerAttr GetOrCreateAttr(PlayerGameData data, uint gid, uint sid)
-    {
-        var attr = data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
-        if (attr != null)
-            return attr;
-
-        attr = new PlayerAttr { Gid = gid, Sid = sid, Val = 0 };
-        data.Attrs.Add(attr);
-        return attr;
-    }
-
     public static void SetAttr(Connection connection, NtfSyncPlayer sync, uint gid, uint sid, uint value)
     {
         var player = connection.Player!;
-        var attr = GetOrCreateAttr(player.Data, gid, sid);
+        var attr = player.Attributes.Set(gid, sid, value);
         attr.Val = value;
-        sync.Custom[player.ToPackedAttrKey(gid, sid)] = value;
-        sync.Custom[player.ToShiftedAttrKey(gid, sid)] = value;
+        player.Attributes.SyncTo(sync, attr);
     }
 
     public static IEnumerable<uint> GetActiveAffixIds(GameSupportCardInfo card, params int[] ignoreSlots)
@@ -113,13 +101,13 @@ internal static class SupporterCardAffixShared
     }
 }
 
-internal sealed class SupporterCardIdParam
+public sealed class SupporterCardIdParam
 {
     [JsonPropertyName("Id")]
     public int SupportCardUid { get; set; }
 }
 
-internal sealed class SupporterCardSelectParam
+public sealed class SupporterCardSelectParam
 {
     [JsonPropertyName("Id")]
     public int SupportCardUid { get; set; }
@@ -128,7 +116,7 @@ internal sealed class SupporterCardSelectParam
     public bool SelectNew { get; set; }
 }
 
-internal sealed class SupporterCardResetInitialParam
+public sealed class SupporterCardResetInitialParam
 {
     [JsonPropertyName("Id")]
     public int SupportCardUid { get; set; }
@@ -140,7 +128,7 @@ internal sealed class SupporterCardResetInitialParam
     public uint FixedId { get; set; }
 }
 
-internal sealed class SupporterCardSelectInitialParam
+public sealed class SupporterCardSelectInitialParam
 {
     [JsonPropertyName("Id")]
     public int SupportCardUid { get; set; }

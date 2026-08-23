@@ -1,10 +1,10 @@
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Misc;
 
 [CallGSApi("ExtendFightLog")]
-public class ExtendFightLog : ICallGSHandler
+public class ExtendFightLog : CallGSHandler
 {
-    public Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
-        return Task.CompletedTask;
+        return Task.FromResult(CallGSResult.NoResponse());
     }
 }

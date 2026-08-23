@@ -3,6 +3,8 @@ using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using System.Text.Json.Nodes;
 
+using MikuSB.Data;
+
 namespace MikuSB.GameServer.Server.CallGS.Handlers.House;
 
 internal static class HouseRequestScript
@@ -101,16 +103,15 @@ internal static class HouseJson
 
 internal static class HouseAttr
 {
-    internal const uint Gid = 101;
-    internal const uint BedroomStartSid = 2550;
+    internal const uint Gid = AttrIds.House.Gid;
+    internal const uint BedroomStartSid = AttrIds.House.BedroomStartSid;
     internal const uint BedroomRegisteredNoRoom = 100;
-    internal const uint PlayerRingInfoSidBase = 3174;
+    internal const uint PlayerRingInfoSidBase = AttrIds.House.PlayerRingInfoSidBase;
     internal const uint BedroomPerFloor = 8;
 
     internal static uint Read(PlayerInstance player, uint sid)
     {
-        var attr = player.Data.Attrs.FirstOrDefault(x => x.Gid == Gid && x.Sid == sid);
-        return attr?.Val ?? 0;
+        return player.Attributes.GetValue(Gid, sid);
     }
 
     internal static async Task SetAsync(
@@ -122,24 +123,16 @@ internal static class HouseAttr
         bool sendImmediate = false)
     {
         var player = connection.Player!;
-        var attr = player.Data.Attrs.FirstOrDefault(x => x.Gid == Gid && x.Sid == sid);
         if (value == 0 && deleteIfZero)
         {
-            if (attr != null)
-                player.Data.Attrs.Remove(attr);
+            player.Attributes.Remove(Gid, sid);
         }
         else
         {
-            if (attr == null)
-            {
-                attr = new PlayerAttr { Gid = Gid, Sid = sid };
-                player.Data.Attrs.Add(attr);
-            }
-            attr.Val = value;
+            player.Attributes.Set(Gid, sid, value);
         }
 
-        sync.Custom[player.ToPackedAttrKey(Gid, sid)] = value;
-        sync.Custom[player.ToShiftedAttrKey(Gid, sid)] = value;
+        player.Attributes.SyncTo(sync, Gid, sid, value);
         if (sendImmediate)
             await player.SendPacket(CmdIds.NtfSetAttr, new NtfSetAttr { Gid = Gid, Sid = sid, Val = value });
     }
@@ -184,11 +177,7 @@ internal static class HouseAttr
         {
             var sid = floorStartSid + i;
 
-            var exists = player.Data.Attrs.Any(x =>
-                x.Gid == Gid &&
-                x.Sid == sid);
-
-            if (!exists)
+            if (player.Attributes.Get(Gid, sid) == null)
                 return sid;
         }
 

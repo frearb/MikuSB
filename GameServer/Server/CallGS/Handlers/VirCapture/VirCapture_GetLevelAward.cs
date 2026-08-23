@@ -13,24 +13,23 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.VirCapture;
 
 [CallGSApi("VirCapture_GetLevelAward")]
-public class VirCapture_GetLevelAward : ICallGSHandler
+public class VirCapture_GetLevelAward : CallGSHandler<VirCaptureGetLevelAwardParam>
 {
-    private const uint VirCaptureGroupId = 128;
-    private const uint CurLevelSid = 3;
-    private const uint LevelAwardFlagStartSid = 101;
-    private const uint LevelAwardFlagEndSid = 120;
+    private const uint VirCaptureGroupId = AttrIds.VirCapture.Gid;
+    private const uint CurLevelSid = AttrIds.VirCapture.CurrentLevelSid;
+    private const uint LevelAwardFlagStartSid = AttrIds.VirCapture.LevelAwardFlagStartSid;
+    private const uint LevelAwardFlagEndSid = AttrIds.VirCapture.LevelAwardFlagEndSid;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override async Task<CallGSResult> HandleAsync(CallGSContext context, VirCaptureGetLevelAwardParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<VirCaptureGetLevelAwardParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.IdList == null || req.IdList.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "VirCapture_GetLevelAward", "{\"tbAwardList\":[]}");
-            return;
+            return CallGSResult.Ok("{\"tbAwardList\":[]}");
         }
 
-        var curLevel = player.Data.Attrs.FirstOrDefault(x => x.Gid == VirCaptureGroupId && x.Sid == CurLevelSid)?.Val ?? 0;
+        var curLevel = player.Attributes.GetValue(VirCaptureGroupId, CurLevelSid);
         var requestedLevels = req.IdList
             .Where(x => x > 0)
             .Select(x => (uint)x)
@@ -39,7 +38,7 @@ public class VirCapture_GetLevelAward : ICallGSHandler
             .ToList();
 
         var claimLevels = requestedLevels
-            .Where(level => level <= curLevel && CanClaimLevel(player.Data, level))
+            .Where(level => level <= curLevel && CanClaimLevel(player, level))
             .ToList();
 
         var sync = new NtfSyncPlayer();
@@ -78,49 +77,31 @@ public class VirCapture_GetLevelAward : ICallGSHandler
         {
             ["tbAwardList"] = responseAwards
         };
-        await CallGSRouter.SendScript(connection, "VirCapture_GetLevelAward", rsp.ToJsonString(), sync);
+        return CallGSResult.Ok(rsp.ToJsonString(), sync);
     }
 
-    private static bool CanClaimLevel(PlayerGameData data, uint level)
+    private static bool CanClaimLevel(PlayerInstance player, uint level)
     {
         var sid = GetLevelAwardSid(level);
         if (sid < LevelAwardFlagStartSid || sid > LevelAwardFlagEndSid)
             return false;
 
         var pos = GetLevelAwardBit(level);
-        var attr = data.Attrs.FirstOrDefault(x => x.Gid == VirCaptureGroupId && x.Sid == sid);
-        return ((attr?.Val ?? 0) & (1u << pos)) == 0;
+        return (player.Attributes.GetValue(VirCaptureGroupId, sid) & (1u << pos)) == 0;
     }
 
     private static void SetClaimed(PlayerInstance player, NtfSyncPlayer sync, uint level)
     {
         var sid = GetLevelAwardSid(level);
         var pos = GetLevelAwardBit(level);
-        var attr = GetOrCreateAttr(player.Data, VirCaptureGroupId, sid);
+        var attr = player.Attributes.GetOrCreate(VirCaptureGroupId, sid);
         attr.Val |= 1u << pos;
-        sync.Custom[player.ToPackedAttrKey(VirCaptureGroupId, sid)] = attr.Val;
-        sync.Custom[player.ToShiftedAttrKey(VirCaptureGroupId, sid)] = attr.Val;
+        player.Attributes.SyncTo(sync, attr);
     }
 
     private static uint GetLevelAwardSid(uint level) => LevelAwardFlagStartSid + (level / 30);
 
     private static int GetLevelAwardBit(uint level) => (int)(level % 30);
-
-    private static PlayerAttr GetOrCreateAttr(PlayerGameData data, uint gid, uint sid)
-    {
-        var attr = data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
-        if (attr != null)
-            return attr;
-
-        attr = new PlayerAttr
-        {
-            Gid = gid,
-            Sid = sid,
-            Val = 0
-        };
-        data.Attrs.Add(attr);
-        return attr;
-    }
 
     private static async Task GrantRewardAsync(PlayerInstance player, NtfSyncPlayer sync, IReadOnlyList<uint> reward)
     {
@@ -259,7 +240,7 @@ public class VirCapture_GetLevelAward : ICallGSHandler
     private static BaseGameItemInfo? AddOtherItem(InventoryData inventory, uint genre, uint detail, uint particular, uint level, uint count)
     {
         var templateId = GameResourceTemplateId.FromGdpl(genre, detail, particular, level);
-        if (!GameData.OtherItemData.TryGetValue((uint)templateId, out var otherItem))
+        if (!GameData.OtherItemData.TryGetValue(templateId, out var otherItem))
             return null;
 
         var maxCount = otherItem.GMnum > 0 ? otherItem.GMnum : 99999u;
@@ -282,7 +263,7 @@ public class VirCapture_GetLevelAward : ICallGSHandler
     }
 }
 
-internal sealed class VirCaptureGetLevelAwardParam
+public sealed class VirCaptureGetLevelAwardParam
 {
     [JsonPropertyName("nId")]
     public int ActId { get; set; }

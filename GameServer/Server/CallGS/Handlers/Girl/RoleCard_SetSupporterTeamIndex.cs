@@ -6,30 +6,28 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("RoleCard_SetSupporterTeamIndex")]
-public class RoleCard_SetSupporterTeamIndex : ICallGSHandler
+public class RoleCard_SetSupporterTeamIndex : CallGSHandler<SetSupporterTeamIndexParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SetSupporterTeamIndexParam req)
     {
-        var req = JsonSerializer.Deserialize<SetSupporterTeamIndexParam>(param);
+
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "RoleCard_SetSupporterTeamIndex", "{\"err\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{\"err\":\"error.BadParam\"}"));
         }
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         var cardData = player.CharacterManager.GetCharacterByGUID(req.CardId);
-        if (cardData == null) return;
-
+        if (cardData == null) return Task.FromResult(CallGSResult.NoResponse());
         cardData.SupportTeamIndex = req.Index;
         var sync = new NtfSyncPlayer
         {
             Items = { cardData.ToProto() }
         };
-        await CallGSRouter.SendScript(connection, "RoleCard_SetSupporterTeamIndex", "null", sync);
+        return Task.FromResult(CallGSResult.Ok("null", sync));
     }
 }
 
-internal sealed class SetSupporterTeamIndexParam
+public sealed class SetSupporterTeamIndexParam
 {
     [JsonPropertyName("Id")]
     public uint CardId { get; set; }

@@ -1,6 +1,7 @@
 using MikuSB.Data;
 using MikuSB.Database;
 using MikuSB.Enums.Item;
+using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -9,23 +10,22 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.VirCapture;
 
 [CallGSApi("VirCapture_ChangeFormation")]
-public class VirCapture_ChangeFormation : ICallGSHandler
+public class VirCapture_ChangeFormation : CallGSHandler<VirCaptureChangeFormationParam>
 {
-    private const uint StrGroupId = 57;
-    private const uint FormationSid = 1;
-    private const uint VirCaptureGroupId = 128;
-    private const uint CurLevelSid = 3;
+    private const uint StrGroupId = AttrIds.VirCapture.FormationStringGid;
+    private const uint FormationSid = AttrIds.VirCapture.FormationSid;
+    private const uint VirCaptureGroupId = AttrIds.VirCapture.Gid;
+    private const uint CurLevelSid = AttrIds.VirCapture.CurrentLevelSid;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, VirCaptureChangeFormationParam req)
     {
-        var req = JsonSerializer.Deserialize<VirCaptureChangeFormationParam>(param);
+
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "VirCapture_ChangeFormation", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         var formation = ReadFormation(player);
         var addId = (uint)Math.Max(0, req.Id);
         var unloadId = (uint)Math.Max(0, req.UnloadId);
@@ -33,23 +33,20 @@ public class VirCapture_ChangeFormation : ICallGSHandler
         var unloadIndex = unloadId == 0 ? -1 : formation.FindIndex(x => x == unloadId);
         if (unloadId > 0 && unloadIndex < 0)
         {
-            await CallGSRouter.SendScript(connection, "VirCapture_ChangeFormation", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         if (addId > 0)
         {
             if (formation.Contains(addId))
             {
-                await CallGSRouter.SendScript(connection, "VirCapture_ChangeFormation", "{\"sErr\":\"error.BadParam\"}");
-                return;
+                return Task.FromResult(CallGSResult.Error("error.BadParam"));
             }
 
             var addItem = player.InventoryManager.GetNormalItem(addId);
             if (addItem == null || addItem.ItemType != ItemTypeEnum.TYPE_MONSTER_CARD)
             {
-                await CallGSRouter.SendScript(connection, "VirCapture_ChangeFormation", "{\"sErr\":\"error.BadParam\"}");
-                return;
+                return Task.FromResult(CallGSResult.Error("error.BadParam"));
             }
         }
 
@@ -66,17 +63,16 @@ public class VirCapture_ChangeFormation : ICallGSHandler
 
         if (!ValidateFormation(player, formation))
         {
-            await CallGSRouter.SendScript(connection, "VirCapture_ChangeFormation", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var json = JsonSerializer.Serialize(formation);
-        player.SetStrAttr(StrGroupId, FormationSid, json);
+        var formationAttr = player.Attributes.SetString(StrGroupId, FormationSid, json);
 
         DatabaseHelper.SaveDatabaseType(player.Data);
 
         var sync = new NtfSyncPlayer();
-        sync.CustomStr[player.ToShiftedAttrKey(StrGroupId, FormationSid)] = json;
+        player.Attributes.SyncTo(sync, formationAttr);
 
         var response = new JsonObject
         {
@@ -85,12 +81,12 @@ public class VirCapture_ChangeFormation : ICallGSHandler
             ["bAdd"] = addId > 0
         };
 
-        await CallGSRouter.SendScript(connection, "VirCapture_ChangeFormation", response.ToJsonString(), sync);
+        return Task.FromResult(CallGSResult.Ok(response.ToJsonString(), sync));
     }
 
     private static List<uint> ReadFormation(MikuSB.GameServer.Game.Player.PlayerInstance player)
     {
-        var raw = player.Data.StrAttrs.FirstOrDefault(x => x.Gid == StrGroupId && x.Sid == FormationSid)?.Val;
+        var raw = player.Attributes.GetStringValue(StrGroupId, FormationSid);
         if (string.IsNullOrWhiteSpace(raw))
             return [];
 
@@ -106,7 +102,9 @@ public class VirCapture_ChangeFormation : ICallGSHandler
 
     private static bool ValidateFormation(MikuSB.GameServer.Game.Player.PlayerInstance player, List<uint> formation)
     {
-        var curLevel = player.Data.Attrs.FirstOrDefault(x => x.Gid == VirCaptureGroupId && x.Sid == CurLevelSid)?.Val ?? 1;
+        var curLevel = player.Attributes.GetValue(VirCaptureGroupId, CurLevelSid);
+        if (curLevel == 0)
+            curLevel = 1;
         if (!GameData.VirCaptureLevelListData.TryGetValue(curLevel, out var levelCfg))
             return formation.Count == 0;
 
@@ -130,7 +128,7 @@ public class VirCapture_ChangeFormation : ICallGSHandler
     }
 }
 
-internal sealed class VirCaptureChangeFormationParam
+public sealed class VirCaptureChangeFormationParam
 {
     [JsonPropertyName("nId")]
     public int Id { get; set; }

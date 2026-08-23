@@ -74,6 +74,8 @@ public class HandlerReqLogin : Handler
 
         connection.State = SessionStateEnum.WAITING_FOR_LOGIN;
         var pd = DatabaseHelper.GetInstance<PlayerGameData>(account.Uid);
+        if (pd != null)
+            pd.CompleteAllQuestLevels = DatabaseHelper.LoadCompleteAllQuestLevels(account.Uid);
         connection.Player = pd == null ? new PlayerInstance(account.Uid) : new PlayerInstance(pd);
         if (connection.Player.Data.EnsureDisplayName())
             DatabaseHelper.UpdateInstance(connection.Player.Data);

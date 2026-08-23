@@ -7,16 +7,15 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Misc;
 
 [CallGSApi("PlayerSetting_SetShowBadge")]
-public class PlayerSetting_SetShowBadge : ICallGSHandler
+public class PlayerSetting_SetShowBadge : CallGSHandler<SetShowBadgeParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SetShowBadgeParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<SetShowBadgeParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "PlayerSetting_SetShowBadge", "{\"err\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{\"err\":\"error.BadParam\"}"));
         }
 
         var slots = new[]
@@ -35,11 +34,11 @@ public class PlayerSetting_SetShowBadge : ICallGSHandler
 
         var sync = new NtfSyncPlayer();
         sync.ShowItems.AddRange(player.Data.ShowItems);
-        await CallGSRouter.SendScript(connection, "PlayerSetting_SetShowBadge", "null", sync);
+        return Task.FromResult(CallGSResult.Ok("null", sync));
     }
 }
 
-internal sealed class SetShowBadgeParam
+public sealed class SetShowBadgeParam
 {
     [JsonPropertyName("tbBadge")]
     public List<uint> Badges { get; set; } = [];

@@ -1,33 +1,29 @@
 using MikuSB.GameServer.Game.Support;
 using MikuSB.Proto;
-using System.Text.Json;
 
 namespace MikuSB.GameServer.Server.CallGS.Handlers.SupporterCard;
 
 [CallGSApi("SupporterCard_ResetInitialAffix")]
-public class SupporterCard_ResetInitialAffix : ICallGSHandler
+public class SupporterCard_ResetInitialAffix : CallGSHandler<SupporterCardResetInitialParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SupporterCardResetInitialParam req)
     {
-        await Reset(connection, param, fixedMode: false);
+        return Reset(context.Connection, req, fixedMode: false);
     }
 
-    internal static async Task Reset(Connection connection, string param, bool fixedMode)
+    internal static Task<CallGSResult> Reset(Connection connection, SupporterCardResetInitialParam req, bool fixedMode)
     {
-        var req = JsonSerializer.Deserialize<SupporterCardResetInitialParam>(param);
-        var card = req == null ? null : connection.Player!.InventoryManager.GetSupportCardItem((uint)req.SupportCardUid);
+        var card = connection.Player!.InventoryManager.GetSupportCardItem((uint)req.SupportCardUid);
         var excel = card == null ? null : SupporterCardAffixShared.GetExcel(card);
-        if (req == null || card == null || excel == null || req.Index is < 1 or > 2 || excel.AffixPool.Count < req.Index)
+        if (card == null || excel == null || req.Index is < 1 or > 2 || excel.AffixPool.Count < req.Index)
         {
-            await SupporterCardAffixShared.SendResetResponse(connection);
-            return;
+            return Task.FromResult(SupporterCardAffixShared.ResetResponse());
         }
 
         var costs = fixedMode ? new[] { excel.FixedAffixCost } : excel.InitialAffixCost;
         if (!costs.Any() || !SupporterCardAffixShared.HasEnoughItems(connection, costs))
         {
-            await SupporterCardAffixShared.SendResetResponse(connection);
-            return;
+            return Task.FromResult(SupporterCardAffixShared.ResetResponse());
         }
 
         var sync = new NtfSyncPlayer();
@@ -49,12 +45,13 @@ public class SupporterCard_ResetInitialAffix : ICallGSHandler
         SupportAffixStateService.SetAffix(card, SupportAffixStateService.PendingInitialAffixSlot, affixId, tier);
         card.AffixId = (uint)req.Index;
 
-        var attr = SupporterCardAffixShared.GetOrCreateAttr(connection.Player!.Data, SupporterCardAffixShared.BaseGid, SupporterCardAffixShared.FixedResetSid);
+        var player = connection.Player!;
+        var attr = player.Attributes.GetOrCreate(SupporterCardAffixShared.BaseGid, SupporterCardAffixShared.FixedResetSid);
         attr.Val += 1;
         SupporterCardAffixShared.SetAttr(connection, sync, SupporterCardAffixShared.BaseGid, SupporterCardAffixShared.FixedResetSid, attr.Val);
 
         sync.Items.Add(card.ToProto());
         SupporterCardAffixShared.Save(connection);
-        await SupporterCardAffixShared.SendResetResponse(connection, sync);
+        return Task.FromResult(SupporterCardAffixShared.ResetResponse(sync));
     }
 }

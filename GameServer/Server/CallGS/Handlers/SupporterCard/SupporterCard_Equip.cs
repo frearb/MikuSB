@@ -6,23 +6,21 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.SupporterCard;
 
 [CallGSApi("SupporterCard_Equip")]
-public class SupporterCard_Equip : ICallGSHandler
+public class SupporterCard_Equip : CallGSHandler<SupporterCardEquipParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SupporterCardEquipParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<SupporterCardEquipParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.CardId == 0 || req.SupportCardUid == 0)
         {
-            await CallGSRouter.SendScript(connection, "Logistics_Equip", "{}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}", "Logistics_Equip"));
         }
 
         var card = player.CharacterManager.GetCharacterByGUID((uint)req.CardId);
         if (card == null)
         {
-            await CallGSRouter.SendScript(connection, "Logistics_Equip", "{}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}", "Logistics_Equip"));
         }
 
         var teamIndex = card.SupportTeamIndex;
@@ -31,8 +29,7 @@ public class SupporterCard_Equip : ICallGSHandler
         // If an existing card is equipped in this slot and bForce is false, ask for confirmation
         if (!req.Force && req.CurrentEquippedUid != 0 && card.SupportSlots.TryGetValue(slot, out var existing) && existing != 0)
         {
-            await CallGSRouter.SendScript(connection, "Logistics_Confirm", "{}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}", "Logistics_Confirm"));
         }
 
         // Perform equip
@@ -45,7 +42,7 @@ public class SupporterCard_Equip : ICallGSHandler
 
         // Req_EquipChange (no Model) → Logistics_Change; Req_Equip (has Model) → Logistics_Equip
         var responseApi = string.IsNullOrEmpty(req.Model) ? "Logistics_Change" : "Logistics_Equip";
-        await CallGSRouter.SendScript(connection, responseApi, "{}", sync);
+        return Task.FromResult(CallGSResult.Ok("{}", sync, responseApi));
     }
 
     private uint GetTeamIndex(uint slot, uint teamIndex)
@@ -57,7 +54,7 @@ public class SupporterCard_Equip : ICallGSHandler
     }
 }
 
-internal sealed class SupporterCardEquipParam
+public sealed class SupporterCardEquipParam
 {
     [JsonPropertyName("EqId")]
     public int CardId { get; set; }

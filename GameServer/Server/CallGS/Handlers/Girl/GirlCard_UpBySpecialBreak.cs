@@ -8,45 +8,40 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("GirlCard_UpBySpecialBreak")]
-public class GirlCard_UpBySpecialBreak : ICallGSHandler
+public class GirlCard_UpBySpecialBreak : CallGSHandler<GirlCardUpBySpecialBreakParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, GirlCardUpBySpecialBreakParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<GirlCardUpBySpecialBreakParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.CardId == 0)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpBySpecialBreak", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var card = player.CharacterManager.GetCharacterByGUID((uint)req.CardId);
         if (card == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpBySpecialBreak", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var cardTemplate = GameData.CardData.Values.FirstOrDefault(x =>
             GameResourceTemplateId.FromGdpl(x.Genre, x.Detail, x.Particular, x.Level) == card.TemplateId);
         if (cardTemplate == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpBySpecialBreak", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         if (cardTemplate.BreakMatID <= 10000 ||
             !GameData.SpecialBreakData.TryGetValue(cardTemplate.BreakMatID, out var specialBreakExcel))
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpBySpecialBreak", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var nextBreak = card.Break + 1;
         if (!specialBreakExcel.HasBreakLevel(nextBreak))
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpBySpecialBreak", "{\"sErr\":\"tip.already_max_break\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("tip.already_max_break"));
         }
 
         var requestedMaterials = new Dictionary<ulong, uint>();
@@ -69,8 +64,7 @@ public class GirlCard_UpBySpecialBreak : ICallGSHandler
 
         if (requestedMaterials.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpBySpecialBreak", "{\"sErr\":\"tip.not_material_for_break\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("tip.not_material_for_break"));
         }
 
         foreach (var (templateId, count) in requestedMaterials)
@@ -78,8 +72,7 @@ public class GirlCard_UpBySpecialBreak : ICallGSHandler
             var item = player.InventoryManager.InventoryData.Items.Values.FirstOrDefault(x => x.TemplateId == templateId);
             if (item == null || item.ItemCount < count)
             {
-                await CallGSRouter.SendScript(connection, "GirlCard_UpBySpecialBreak", "{\"sErr\":\"tip.not_material_for_break\"}");
-                return;
+                return Task.FromResult(CallGSResult.Error("tip.not_material_for_break"));
             }
         }
 
@@ -109,7 +102,7 @@ public class GirlCard_UpBySpecialBreak : ICallGSHandler
         var sync = new NtfSyncPlayer();
         sync.Items.AddRange(syncItems);
 
-        await CallGSRouter.SendScript(connection, "GirlCard_UpBySpecialBreak", "{}", sync);
+        return Task.FromResult(CallGSResult.Ok("{}", sync));
     }
 
     private static Item BuildRemovedProto(BaseGameItemInfo item)
@@ -120,7 +113,7 @@ public class GirlCard_UpBySpecialBreak : ICallGSHandler
     }
 }
 
-internal sealed class GirlCardUpBySpecialBreakParam
+public sealed class GirlCardUpBySpecialBreakParam
 {
     [JsonPropertyName("nCardId")]
     public int CardId { get; set; }

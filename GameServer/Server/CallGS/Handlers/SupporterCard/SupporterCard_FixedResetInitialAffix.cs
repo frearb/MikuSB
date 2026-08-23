@@ -1,10 +1,10 @@
 namespace MikuSB.GameServer.Server.CallGS.Handlers.SupporterCard;
 
 [CallGSApi("SupporterCard_FixedResetInitialAffix")]
-public class SupporterCard_FixedResetInitialAffix : ICallGSHandler
+public class SupporterCard_FixedResetInitialAffix : CallGSHandler<SupporterCardResetInitialParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SupporterCardResetInitialParam req)
     {
-        await SupporterCard_ResetInitialAffix.Reset(connection, param, fixedMode: true);
+        return SupporterCard_ResetInitialAffix.Reset(context.Connection, req, fixedMode: true);
     }
 }

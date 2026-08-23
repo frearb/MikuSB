@@ -4,11 +4,11 @@ namespace MikuSB.GameServer.Server.CallGS.Handlers.Achievement;
 // param: {nId}
 // Response: {}
 [CallGSApi("Achievement_GetReward")]
-public class Achievement_GetReward : ICallGSHandler
+public class Achievement_GetReward : CallGSHandler
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
         // TODO: validate achievement completion and grant reward items
-        await CallGSRouter.SendScript(connection, "Achievement_GetReward", "{}");
+        return Task.FromResult(CallGSResult.Ok("{}"));
     }
 }

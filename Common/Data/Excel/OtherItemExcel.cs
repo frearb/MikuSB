@@ -24,11 +24,13 @@ public class OtherItemExcel : ExcelResource
     [JsonIgnore]
     public uint GMnum => ReadUInt(GMnumRaw);
 
-    public override uint GetId() => (uint)GameResourceTemplateId.FromGdpl(Genre, Detail, Particular, Level);
+    public ulong TemplateId => GameResourceTemplateId.FromGdpl(Genre, Detail, Particular, Level);
+
+    public override uint GetId() => (uint)TemplateId;
 
     public override void Loaded()
     {
-        GameData.OtherItemData[GetId()] = this;
+        GameData.OtherItemData[TemplateId] = this;
     }
 
     private static uint ReadUInt(JToken? token)

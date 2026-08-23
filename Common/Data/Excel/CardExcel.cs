@@ -9,6 +9,7 @@ public class CardExcel : ExcelResource
     public uint Detail { get; set; }
     public uint Particular { get; set; }
     public uint Level { get; set; }
+    public uint Color { get; set; }
     public uint Icon { get; set; }
     public uint InitBreak { get; set; }
     public int BreakMatID { get; set; }

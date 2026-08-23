@@ -4,11 +4,11 @@ namespace MikuSB.GameServer.Server.CallGS.Handlers.Rogue3D;
 // param: [] (empty)
 // Response: {"listActId":[...]}
 [CallGSApi("Rogue3D_CheckOpenAct")]
-public class Rogue3D_CheckOpenAct : ICallGSHandler
+public class Rogue3D_CheckOpenAct : CallGSHandler
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
-        var sync = Rogue3DStateHelper.EnsureUnlockState(connection.Player!);
-        await CallGSRouter.SendScript(connection, "Rogue3D_CheckOpenAct", "{\"bOpen\":true}", sync);
+        var sync = context.Player.Rogue3DManager.EnsureUnlockState();
+        return Task.FromResult(CallGSResult.Ok("{\"bOpen\":true}", sync));
     }
 }

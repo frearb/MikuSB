@@ -7,17 +7,15 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("GirlCard_SetRoleLikeFlag")]
-public class GirlCard_SetRoleLikeFlag : ICallGSHandler
+public class GirlCard_SetRoleLikeFlag : CallGSHandler<SetRoleLikeFlagParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SetRoleLikeFlagParam girlData)
     {
-        var player = connection.Player!;
-        var girlData = JsonSerializer.Deserialize<SetRoleLikeFlagParam>(param);
-        if (girlData == null) return;
+        var player = context.Connection.Player!;
 
+        if (girlData == null) return Task.FromResult(CallGSResult.NoResponse());
         var cardData = player.CharacterManager.GetCharacterByGUID(girlData.CardId);
-        if (cardData == null) return;
-
+        if (cardData == null) return Task.FromResult(CallGSResult.NoResponse());
         cardData.Flag = girlData.Flag == 1
             ? ItemFlagEnum.FLAG_ROLE_LIKE | ItemFlagEnum.FLAG_READED
             : ItemFlagEnum.FLAG_READED;
@@ -30,11 +28,11 @@ public class GirlCard_SetRoleLikeFlag : ICallGSHandler
             Items = { cardData.ToProto() }
         };
 
-        await CallGSRouter.SendScript(connection, "GirlCard_SetRoleLikeFlag", "{}", sync);
+        return Task.FromResult(CallGSResult.Ok("{}", sync));
     }
 }
 
-internal sealed class SetRoleLikeFlagParam
+public sealed class SetRoleLikeFlagParam
 {
     [JsonPropertyName("nFlag")]
     public int Flag { get; set; }

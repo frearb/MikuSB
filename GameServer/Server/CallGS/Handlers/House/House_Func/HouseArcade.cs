@@ -8,7 +8,7 @@ public class ArcadeGameEnterMainUI : IHouseFuncHandler
 {
     private static readonly int[] ArcadeUnlockedGirlList = [1, 5, 13, 23, 10];
 
-    public async Task Handle(Connection connection, string param)
+    public Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var unlockGirls = new JsonArray();
         foreach (var girlId in ArcadeUnlockedGirlList)
@@ -19,7 +19,7 @@ public class ArcadeGameEnterMainUI : IHouseFuncHandler
             ["tbUnlockGirlList"] = unlockGirls,
             ["FuncName"] = "ArcadeGameEnterMainUI"
         };
-        await CallGSRouter.SendScript(connection, "House_Request", HouseRequestScript.Success(rsp));
+        return Task.FromResult(CallGSResult.Ok(HouseRequestScript.Success(rsp)));
     }
 }
 
@@ -28,14 +28,14 @@ public class ArcadeGameEnter : IHouseFuncHandler
 {
     private static readonly Random Random = new();
 
-    public async Task Handle(Connection connection, string param)
+    public Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var rsp = new JsonObject
         {
             ["FuncName"] = "ArcadeGameEnter",
             ["nSeed"] = Random.Next(1, 1_000_000_000)
         };
-        await CallGSRouter.SendScript(connection, "House_Request", HouseRequestScript.Success(rsp));
+        return Task.FromResult(CallGSResult.Ok(HouseRequestScript.Success(rsp)));
     }
 }
 
@@ -55,12 +55,11 @@ public class ArcadeGameSettlement : IHouseFuncHandler
     private const int ArcadeGameModeNormal = 1;
     private const int ArcadeGameModeEndless = 2;
 
-    public async Task Handle(Connection connection, string param)
+    public async Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var root = HouseJson.ParseObject(param);
-        if (root == null) return;
-
-        var player = connection.Player!;
+        if (root == null) return CallGSResult.NoResponse();
+        var player = context.Connection.Player!;
         var sync = new NtfSyncPlayer();
         var modeType = HouseJson.NumField(root, "nModeType");
         var finishRound = Math.Max(0, HouseJson.NumField(root, "nFinishRound"));
@@ -78,7 +77,7 @@ public class ArcadeGameSettlement : IHouseFuncHandler
                 if (sid > HouseArcadeInfoStart + ArcadeAttrConditionValEndOffset) continue;
                 var prev = HouseAttr.Read(player, sid);
                 if ((uint)value > prev)
-                    await HouseAttr.SetAsync(connection, sid, (uint)value, sync);
+                    await HouseAttr.SetAsync(context.Connection, sid, (uint)value, sync);
             }
         }
 
@@ -128,14 +127,14 @@ public class ArcadeGameSettlement : IHouseFuncHandler
                     var slot = slotState[foundSid.Value];
                     slot.Count = (ushort)Math.Min(0xffff, slot.Count + count);
                     slotState[foundSid.Value] = slot;
-                    await HouseAttr.SetAsync(connection, foundSid.Value, HouseAttr.PackArcadePropUse(slot.Type, slot.Id, slot.Count), sync);
+                    await HouseAttr.SetAsync(context.Connection, foundSid.Value, HouseAttr.PackArcadePropUse(slot.Type, slot.Id, slot.Count), sync);
                 }
                 else if (emptySlots.Count > 0)
                 {
                     var sid = emptySlots.Dequeue();
                     var packedCount = (ushort)Math.Min(0xffff, count);
                     slotState[sid] = new ArcadePropUseSlot { Type = type, Id = id, Count = packedCount };
-                    await HouseAttr.SetAsync(connection, sid, HouseAttr.PackArcadePropUse(type, id, packedCount), sync);
+                    await HouseAttr.SetAsync(context.Connection, sid, HouseAttr.PackArcadePropUse(type, id, packedCount), sync);
                 }
             }
         }
@@ -153,7 +152,7 @@ public class ArcadeGameSettlement : IHouseFuncHandler
                     var sid = HouseArcadeInfoStart + ArcadeAttrGirlNormalModeStateOffset + (uint)girlId;
                     if (sid > HouseArcadeInfoStart + ArcadeAttrGirlNormalModeStateEndOffset) continue;
                     var prev = HouseAttr.Read(player, sid);
-                    await HouseAttr.SetAsync(connection, sid, prev + (uint)finishRound, sync);
+                    await HouseAttr.SetAsync(context.Connection, sid, prev + (uint)finishRound, sync);
                 }
             }
             nAddExp = finishRound * 10;
@@ -163,7 +162,7 @@ public class ArcadeGameSettlement : IHouseFuncHandler
             var scoreSid = HouseArcadeInfoStart + ArcadeAttrEndlessScoreOffset;
             var prevScore = HouseAttr.Read(player, scoreSid);
             if ((uint)maxScore > prevScore)
-                await HouseAttr.SetAsync(connection, scoreSid, (uint)maxScore, sync);
+                await HouseAttr.SetAsync(context.Connection, scoreSid, (uint)maxScore, sync);
 
             var bitsSid = HouseArcadeInfoStart + ArcadeAttrGirlEndlessModeStateOffset;
             var bits = HouseAttr.Read(player, bitsSid);
@@ -178,7 +177,7 @@ public class ArcadeGameSettlement : IHouseFuncHandler
                 }
             }
             if (bits != originalBits)
-                await HouseAttr.SetAsync(connection, bitsSid, bits, sync);
+                await HouseAttr.SetAsync(context.Connection, bitsSid, bits, sync);
 
             nAddExp = maxScore / 10;
         }
@@ -187,7 +186,7 @@ public class ArcadeGameSettlement : IHouseFuncHandler
         {
             var expSid = HouseArcadeInfoStart + ArcadeAttrExpOffset;
             var prevExp = HouseAttr.Read(player, expSid);
-            await HouseAttr.SetAsync(connection, expSid, prevExp + (uint)nAddExp, sync);
+            await HouseAttr.SetAsync(context.Connection, expSid, prevExp + (uint)nAddExp, sync);
         }
 
         var rsp = new JsonObject
@@ -195,7 +194,7 @@ public class ArcadeGameSettlement : IHouseFuncHandler
             ["nAddExp"] = nAddExp,
             ["FuncName"] = "ArcadeGameSettlement"
         };
-        await CallGSRouter.SendScript(connection, "House_Request", HouseRequestScript.Success(rsp), sync);
+        return CallGSResult.Ok(HouseRequestScript.Success(rsp), sync);
     }
 
     private struct ArcadePropUseSlot
@@ -209,29 +208,29 @@ public class ArcadeGameSettlement : IHouseFuncHandler
 [HouseFunc("ArcadeGameLogSettlement")]
 public class ArcadeGameLogSettlement : IHouseFuncHandler
 {
-    public async Task Handle(Connection connection, string param)
+    public Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var rsp = new JsonObject { ["FuncName"] = "ArcadeGameLogSettlement" };
-        await CallGSRouter.SendScript(connection, "House_Request", HouseRequestScript.Success(rsp));
+        return Task.FromResult(CallGSResult.Ok(HouseRequestScript.Success(rsp)));
     }
 }
 
 [HouseFunc("ArcadeGameGetLevelReward")]
 public class ArcadeGameGetLevelReward : IHouseFuncHandler
 {
-    public async Task Handle(Connection connection, string param)
+    public Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var rsp = new JsonObject { ["FuncName"] = "ArcadeGameGetLevelReward" };
-        await CallGSRouter.SendScript(connection, "House_Request", HouseRequestScript.Success(rsp));
+        return Task.FromResult(CallGSResult.Ok(HouseRequestScript.Success(rsp)));
     }
 }
 
 [HouseFunc("ArcadeGameGetAchReward")]
 public class ArcadeGameGetAchReward : IHouseFuncHandler
 {
-    public async Task Handle(Connection connection, string param)
+    public Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var rsp = new JsonObject { ["FuncName"] = "ArcadeGameGetAchReward" };
-        await CallGSRouter.SendScript(connection, "House_Request", HouseRequestScript.Success(rsp));
+        return Task.FromResult(CallGSResult.Ok(HouseRequestScript.Success(rsp)));
     }
 }

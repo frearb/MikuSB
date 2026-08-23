@@ -11,16 +11,15 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Inventory;
 
 [CallGSApi("Item_Recycle")]
-public class Item_Recycle : ICallGSHandler
+public class Item_Recycle : CallGSHandler<ItemRecycleParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override async Task<CallGSResult> HandleAsync(CallGSContext context, ItemRecycleParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<ItemRecycleParam>(param);
+        var player = context.Connection.Player!;
+
         if (req?.TbItems == null || req.TbItems.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "Item_Recycle", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         var config = RecycleConfig.Load();
@@ -33,15 +32,13 @@ public class Item_Recycle : ICallGSHandler
 
             if (item == null)
             {
-                await CallGSRouter.SendScript(connection, "Item_Recycle", "{\"sErr\":\"error.Recycle.ItemNotExists\"}");
-                return;
+                return CallGSResult.Error("error.Recycle.ItemNotExists");
             }
 
             var recycleId = GetRecycleId(item);
             if (recycleId <= 0 || !config.HasConfig(recycleId))
             {
-                await CallGSRouter.SendScript(connection, "Item_Recycle", "{\"sErr\":\"error.Recycle.ItemCanNotRecycle\"}");
-                return;
+                return CallGSResult.Error("error.Recycle.ItemCanNotRecycle");
             }
 
             itemsToRecycle.Add((item, recycleId));
@@ -60,7 +57,7 @@ public class Item_Recycle : ICallGSHandler
 
         DatabaseHelper.SaveDatabaseType(player.InventoryManager.InventoryData);
 
-        await CallGSRouter.SendScript(connection, "Item_Recycle", "{}", sync);
+        return CallGSResult.Ok("{}", sync);
     }
 
     private static int GetRecycleId(BaseGameItemInfo item)
@@ -309,7 +306,7 @@ internal readonly record struct RecycleEntry(
 
 internal readonly record struct SupplyTemplate(uint Genre, uint Detail, uint Particular, uint Level, uint ProvideExp);
 
-internal sealed class ItemRecycleParam
+public sealed class ItemRecycleParam
 {
     [JsonPropertyName("tbItems")]
     public List<int> TbItems { get; set; } = [];

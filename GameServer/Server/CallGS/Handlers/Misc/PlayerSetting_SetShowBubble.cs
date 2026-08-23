@@ -7,20 +7,18 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Misc;
 
 [CallGSApi("PlayerSetting_SetShowBubble")]
-public class PlayerSetting_SetShowBubble : ICallGSHandler
+public class PlayerSetting_SetShowBubble : CallGSHandler<SetShowBubbleParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SetShowBubbleParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<SetShowBubbleParam>(param);
-        if (req == null)
-            return;
+        var player = context.Connection.Player!;
 
+        if (req == null)
+            return Task.FromResult(CallGSResult.NoResponse());
         var item = player.InventoryManager.GetNormalItem(req.Id);
         if (item == null)
         {
-            await CallGSRouter.SendScript(connection, "PlayerSetting_SetShowBubble", "{\"err\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{\"err\":\"error.BadParam\"}"));
         }
 
         player.SetShowItem((int)ProfileShowItemTypeEnum.SHOWITEM_BUBBLE, item.UniqueId);
@@ -28,11 +26,11 @@ public class PlayerSetting_SetShowBubble : ICallGSHandler
 
         var sync = new NtfSyncPlayer();
         sync.ShowItems.AddRange(player.Data.ShowItems);
-        await CallGSRouter.SendScript(connection, "PlayerSetting_SetShowBubble", "null", sync);
+        return Task.FromResult(CallGSResult.Ok("null", sync));
     }
 }
 
-internal sealed class SetShowBubbleParam
+public sealed class SetShowBubbleParam
 {
     [JsonPropertyName("nID")]
     public uint Id { get; set; }

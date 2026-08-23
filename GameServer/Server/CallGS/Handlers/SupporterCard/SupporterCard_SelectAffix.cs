@@ -5,17 +5,16 @@ using System.Text.Json;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.SupporterCard;
 
 [CallGSApi("SupporterCard_SelectAffix")]
-public class SupporterCard_SelectAffix : ICallGSHandler
+public class SupporterCard_SelectAffix : CallGSHandler<SupporterCardSelectParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SupporterCardSelectParam req)
     {
-        var req = JsonSerializer.Deserialize<SupporterCardSelectParam>(param);
-        var card = req == null ? null : connection.Player!.InventoryManager.GetSupportCardItem((uint)req.SupportCardUid);
+
+        var card = req == null ? null : context.Connection.Player!.InventoryManager.GetSupportCardItem((uint)req.SupportCardUid);
         if (card == null || !SupportAffixStateService.HasAffix(card, SupportAffixStateService.PendingMaxAffixSlot))
         {
-            await SupporterCardAffixShared.SendSelectResponse(connection);
-            return;
-        }
+            return Task.FromResult(SupporterCardAffixShared.SelectResponse());
+}
 
         if (req!.SelectNew)
             SupportAffixStateService.CopyAffix(card, SupportAffixStateService.PendingMaxAffixSlot, SupportAffixStateService.ActiveThirdAffixSlot);
@@ -24,7 +23,7 @@ public class SupporterCard_SelectAffix : ICallGSHandler
 
         var sync = new NtfSyncPlayer();
         sync.Items.Add(card.ToProto());
-        SupporterCardAffixShared.Save(connection);
-        await SupporterCardAffixShared.SendSelectResponse(connection, sync);
+        SupporterCardAffixShared.Save(context.Connection);
+        return Task.FromResult(SupporterCardAffixShared.SelectResponse(sync));
     }
 }

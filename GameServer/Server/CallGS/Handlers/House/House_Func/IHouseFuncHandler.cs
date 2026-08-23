@@ -1,3 +1,5 @@
+using MikuSB.GameServer.Server.CallGS;
+
 namespace MikuSB.GameServer.Server.CallGS.Handlers.House;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
@@ -8,5 +10,5 @@ public class HouseFuncAttribute(string funcName) : Attribute
 
 public interface IHouseFuncHandler
 {
-    Task Handle(Connection connection, string param);
+    Task<CallGSResult> Handle(CallGSContext context, string param);
 }

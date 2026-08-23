@@ -14,64 +14,60 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Shop;
 
 [CallGSApi("IBLogic_BuyGoods")]
-public class IBLogic_BuyGoods : ICallGSHandler
+public class IBLogic_BuyGoods : CallGSHandler<IbBuyGoodsParam>
 {
-    private const uint BuyGroupId = 26;
-    private const uint RedGroupId = 113;
-    private const uint CashGroupId = 1;
-    private const uint BattlePassGroupId = 25;
-    private const uint BattlePassCurIdSid = 1;
-    private const uint BattlePassStatusSid = 2;
+    private const uint BuyGroupId = AttrIds.Shop.PurchaseGid;
+    private const uint RedGroupId = AttrIds.Shop.RedDotGid;
+    private const uint CashGroupId = AttrIds.CurrencyGid;
+    private const uint BattlePassGroupId = AttrIds.BattlePass.Gid;
+    private const uint BattlePassCurIdSid = AttrIds.BattlePass.CurrentIdSid;
+    private const uint BattlePassStatusSid = AttrIds.BattlePass.StatusSid;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override async Task<CallGSResult> HandleAsync(CallGSContext context, IbBuyGoodsParam req)
     {
-        var req = JsonSerializer.Deserialize<IbBuyGoodsParam>(param);
-        var player = connection.Player!;
+
+        var player = context.Connection.Player!;
         if (req?.Type == 3 && req.GoodsId > 0 && req.Count > 0)
         {
-            await HandleBattlePassPurchase(connection, player, req);
-            return;
-        }
+            return await HandleBattlePassPurchase(player, req);
+}
 
         if (req == null ||
             req.GoodsId == 0 ||
             req.Count == 0 ||
             !GameData.IbGoodsData.TryGetValue(req.GoodsId, out var goods))
         {
-            await CallGSRouter.SendScript(connection, "IBLogic_BuyGoods", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         if (goods.LimitTimes > 0)
         {
-            var buyAttr = GetOrCreateAttr(player, BuyGroupId, req.GoodsId);
+            var buyAttr = player.Attributes.GetOrCreate(BuyGroupId, req.GoodsId);
             if (buyAttr.Val >= goods.LimitTimes)
             {
-                await CallGSRouter.SendScript(connection, "IBLogic_BuyGoods", "{\"sErr\":\"tip.Mall_Limit_Buy\"}");
-                return;
+                return CallGSResult.Error("tip.Mall_Limit_Buy");
             }
         }
 
         var rewardItems = BuildRewardItems(goods, req);
         if (rewardItems.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "IBLogic_BuyGoods", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         var sync = new NtfSyncPlayer();
         foreach (var reward in rewardItems)
             await GrantRewardAsync(player, sync, reward);
 
-        var buyCountAttr = GetOrCreateAttr(player, BuyGroupId, req.GoodsId);
+        var buyCountAttr = player.Attributes.GetOrCreate(BuyGroupId, req.GoodsId);
         buyCountAttr.Val += req.Count;
-        SyncAttr(player, sync, buyCountAttr);
+        player.Attributes.SyncTo(sync, buyCountAttr);
 
-        var redAttr = GetOrCreateAttr(player, RedGroupId, req.GoodsId);
+        var redAttr = player.Attributes.GetOrCreate(RedGroupId, req.GoodsId);
         if (redAttr.Val == 0)
         {
             redAttr.Val = 1;
-            SyncAttr(player, sync, redAttr);
+            player.Attributes.SyncTo(sync, redAttr);
         }
 
         DatabaseHelper.SaveDatabaseType(player.Data);
@@ -101,36 +97,36 @@ public class IBLogic_BuyGoods : ICallGSHandler
         if (cost.Count >= 2)
             rsp["nTotalPrice"] = (int)cost[1];
 
-        await CallGSRouter.SendScript(connection, "IBLogic_BuyGoods", rsp.ToJsonString(), sync);
+        return CallGSResult.Ok(rsp.ToJsonString(), sync);
     }
 
-    private static async Task HandleBattlePassPurchase(Connection connection, PlayerInstance player, IbBuyGoodsParam req)
+    private static Task<CallGSResult> HandleBattlePassPurchase(PlayerInstance player, IbBuyGoodsParam req)
     {
         var sync = new NtfSyncPlayer();
         var battlePassId = ResolveCurrentBattlePassId();
         if (battlePassId > 0)
         {
-            var curIdAttr = GetOrCreateAttr(player, BattlePassGroupId, BattlePassCurIdSid);
+            var curIdAttr = player.Attributes.GetOrCreate(BattlePassGroupId, BattlePassCurIdSid);
             curIdAttr.Val = battlePassId;
-            SyncAttr(player, sync, curIdAttr);
+            player.Attributes.SyncTo(sync, curIdAttr);
         }
 
-        var statusAttr = GetOrCreateAttr(player, BattlePassGroupId, BattlePassStatusSid);
+        var statusAttr = player.Attributes.GetOrCreate(BattlePassGroupId, BattlePassStatusSid);
         if (statusAttr.Val < 2)
         {
             statusAttr.Val = 2;
-            SyncAttr(player, sync, statusAttr);
+            player.Attributes.SyncTo(sync, statusAttr);
         }
 
-        var buyCountAttr = GetOrCreateAttr(player, BuyGroupId, req.GoodsId);
+        var buyCountAttr = player.Attributes.GetOrCreate(BuyGroupId, req.GoodsId);
         buyCountAttr.Val += req.Count;
-        SyncAttr(player, sync, buyCountAttr);
+        player.Attributes.SyncTo(sync, buyCountAttr);
 
-        var redAttr = GetOrCreateAttr(player, RedGroupId, req.GoodsId);
+        var redAttr = player.Attributes.GetOrCreate(RedGroupId, req.GoodsId);
         if (redAttr.Val == 0)
         {
             redAttr.Val = 1;
-            SyncAttr(player, sync, redAttr);
+            player.Attributes.SyncTo(sync, redAttr);
         }
 
         DatabaseHelper.SaveDatabaseType(player.Data);
@@ -141,7 +137,7 @@ public class IBLogic_BuyGoods : ICallGSHandler
             ["tbGoods"] = new JsonArray()
         };
 
-        await CallGSRouter.SendScript(connection, "IBLogic_BuyGoods", rsp.ToJsonString(), sync);
+        return Task.FromResult(CallGSResult.Ok(rsp.ToJsonString(), sync));
     }
 
     private static List<List<uint>> BuildRewardItems(IbGoodsExcel goods, IbBuyGoodsParam req)
@@ -313,7 +309,7 @@ public class IBLogic_BuyGoods : ICallGSHandler
     private static BaseGameItemInfo? AddOtherItem(InventoryData inventory, uint genre, uint detail, uint particular, uint level, uint count)
     {
         var templateId = GameResourceTemplateId.FromGdpl(genre, detail, particular, level);
-        if (!GameData.OtherItemData.TryGetValue((uint)templateId, out var otherItem))
+        if (!GameData.OtherItemData.TryGetValue(templateId, out var otherItem))
             return null;
 
         var maxCount = otherItem.GMnum > 0 ? otherItem.GMnum : 99999u;
@@ -337,16 +333,16 @@ public class IBLogic_BuyGoods : ICallGSHandler
 
     private static bool TryGrantCashBox(PlayerInstance player, NtfSyncPlayer sync, uint detail, uint particular, uint level, uint count)
     {
-        var templateId = (uint)GameResourceTemplateId.FromGdpl((uint)ItemTypeEnum.TYPE_USEABLE, detail, particular, level);
+        var templateId = GameResourceTemplateId.FromGdpl((uint)ItemTypeEnum.TYPE_USEABLE, detail, particular, level);
         if (!GameData.OtherItemData.TryGetValue(templateId, out var otherItem))
             return false;
 
         uint moneyType = otherItem.LuaType switch
         {
-            "money_box" => 1,
-            "gold_box" => 2,
-            "silver_box" => 3,
-            "vigor_box" => 4,
+            "money_box" => AttrIds.Currency.Money,
+            "gold_box" => AttrIds.Currency.Gold,
+            "silver_box" => AttrIds.Currency.Silver,
+            "vigor_box" => AttrIds.Currency.Vigor,
             _ => 0
         };
 
@@ -354,11 +350,11 @@ public class IBLogic_BuyGoods : ICallGSHandler
             return false;
 
         var amount = checked(otherItem.Param1 * count);
-        var sid = moneyType * 2 + 1;
-        var attr = GetOrCreateAttr(player, CashGroupId, sid);
+        var sid = AttrIds.Currency.GetSid(moneyType);
+        var attr = player.Attributes.GetOrCreate(CashGroupId, sid);
         attr.Val += amount;
-        SyncAttr(player, sync, attr);
-        if (moneyType == 1)
+        player.Attributes.SyncTo(sync, attr);
+        if (moneyType == AttrIds.Currency.Money)
         {
             foreach (var (key, value) in player.BuildMoneySync())
                 sync.Money[key] = value;
@@ -407,29 +403,9 @@ public class IBLogic_BuyGoods : ICallGSHandler
             : null;
     }
 
-    private static PlayerAttr GetOrCreateAttr(PlayerInstance player, uint gid, uint sid)
-    {
-        var attr = player.Data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
-        if (attr != null)
-            return attr;
-
-        attr = new PlayerAttr
-        {
-            Gid = gid,
-            Sid = sid
-        };
-        player.Data.Attrs.Add(attr);
-        return attr;
-    }
-
-    private static void SyncAttr(PlayerInstance player, NtfSyncPlayer sync, PlayerAttr attr)
-    {
-        sync.Custom[player.ToPackedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-        sync.Custom[player.ToShiftedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-    }
 }
 
-internal sealed class IbBuyGoodsParam
+public sealed class IbBuyGoodsParam
 {
     [JsonPropertyName("nType")]
     public int Type { get; set; }

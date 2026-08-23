@@ -106,6 +106,7 @@ public class SocketConnection
             var output = $"{sendOrRecv}: {LogMap[opcode]}({opcode}) ({framing})\r\n{asJson}";
             if (ConfigManager.Config.ServerOption.DebugMessage)
                 Logger.Debug(output);
+            InGameConsoleBridge.PublishPacketLog(output);
             if (DebugFile == "" || !ConfigManager.Config.ServerOption.SavePersonalDebugFile) return;
             var sw = GetWriter();
             sw.WriteLine($"[{DateTime.Now:HH:mm:ss}] [GameServer] [DEBUG] " + output);
@@ -116,6 +117,7 @@ public class SocketConnection
             var output = $"{sendOrRecv}: {LogMap.GetValueOrDefault(opcode, "UnknownPacket")}({opcode})";
             if (ConfigManager.Config.ServerOption.DebugMessage)
                 Logger.Debug(output);
+            InGameConsoleBridge.PublishPacketLog(output);
             if (DebugFile != "" && ConfigManager.Config.ServerOption.SavePersonalDebugFile)
             {
                 var sw = GetWriter();

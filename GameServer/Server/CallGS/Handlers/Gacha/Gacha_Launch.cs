@@ -13,37 +13,35 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Gacha;
 
 [CallGSApi("Gacha_Launch")]
-public class Gacha_Launch : ICallGSHandler
+public class Gacha_Launch : CallGSHandler<GachaLaunchParam>
 {
-    private const uint GachaGid = 5;
-    private const uint GachaSgid = 42;
-    private const uint SidTotalTime = 1;
-    private const uint SidDailyTotalTime = 2;
+    private const uint GachaGid = AttrIds.Gacha.Gid;
+    private const uint GachaSgid = AttrIds.Gacha.StringGid;
+    private const uint SidTotalTime = AttrIds.Gacha.TotalTimeSid;
+    private const uint SidDailyTotalTime = AttrIds.Gacha.DailyTotalTimeSid;
     private const uint Interval = 10;
-    private const uint SidTimeInheritStart = 20000;
-    private const uint SidTimeNotInheritStart = 10;
-    private const uint SidAddTimeItem = 1;
-    private const uint SidAddTimeProb = 2;
-    private const uint SidAddProtectType = 3;
-    private const uint SidAddTotalTime = 7;
+    private const uint SidTimeInheritStart = AttrIds.Gacha.TimeInheritStartSid;
+    private const uint SidTimeNotInheritStart = AttrIds.Gacha.TimeNotInheritStartSid;
+    private const uint SidAddTimeItem = AttrIds.Gacha.AddTimeItemSid;
+    private const uint SidAddTimeProb = AttrIds.Gacha.AddTimeProbSid;
+    private const uint SidAddProtectType = AttrIds.Gacha.AddProtectTypeSid;
+    private const uint SidAddTotalTime = AttrIds.Gacha.AddTotalTimeSid;
     private const int UpSelectIndex = 0;
     private const int UpSelectGetFlagIndex = 1;
     private static readonly Random Rng = new();
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override async Task<CallGSResult> HandleAsync(CallGSContext context, GachaLaunchParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<GachaLaunchParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.NId == 0 || req.NTime is not (1 or 10))
         {
-            await CallGSRouter.SendScript(connection, "Gacha_Launch", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         if (!GameData.GachaData.TryGetValue((uint)req.NId, out var gachaCfg))
         {
-            await CallGSRouter.SendScript(connection, "Gacha_Launch", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         var poolNames = (gachaCfg.Pool ?? [])
@@ -55,8 +53,7 @@ public class Gacha_Launch : ICallGSHandler
 
         if (allPoolItems.Count == 0 || !GameData.GachaProbabilityData.TryGetValue(gachaCfg.Probability, out var baseProbCfg))
         {
-            await CallGSRouter.SendScript(connection, "Gacha_Launch", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         var pityState = LoadPityState(player, gachaCfg);
@@ -160,8 +157,7 @@ public class Gacha_Launch : ICallGSHandler
 
         if (awards.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "Gacha_Launch", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         SavePityState(player, gachaCfg, pityState, awards.Count, sync);
@@ -173,7 +169,7 @@ public class Gacha_Launch : ICallGSHandler
         sync.Items.AddRange(syncItems);
 
         var rsp = BuildResponse(req.NId, awards, tbNew, tbTrigger);
-        await CallGSRouter.SendScript(connection, "Gacha_Launch", rsp, sync);
+        return CallGSResult.Ok(rsp, sync);
     }
 
     private static bool HasGuaranteedTenRarity(GachaRuntimeConfig config, List<List<uint>> awards)
@@ -301,7 +297,7 @@ public class Gacha_Launch : ICallGSHandler
         if (gachaCfg.UpSelect != 1)
             return new GachaUpSelectState();
 
-        var raw = player.Data.StrAttrs.FirstOrDefault(x => x.Gid == GachaSgid && x.Sid == gachaCfg.ID)?.Val;
+        var raw = player.Attributes.GetStringValue(GachaSgid, gachaCfg.ID);
         if (string.IsNullOrWhiteSpace(raw))
             return new GachaUpSelectState();
 
@@ -342,8 +338,8 @@ public class Gacha_Launch : ICallGSHandler
         state.RawState[UpSelectGetFlagIndex] = state.GuaranteedNext ? 1 : 0;
 
         var value = state.RawState.ToString(Newtonsoft.Json.Formatting.None);
-        player.SetStrAttr(GachaSgid, gachaCfg.ID, value);
-        sync.CustomStr[player.ToShiftedAttrKey(GachaSgid, gachaCfg.ID)] = value;
+        var attr = player.Attributes.SetString(GachaSgid, gachaCfg.ID, value);
+        player.Attributes.SyncTo(sync, attr);
     }
 
     private static uint GetBaseSid(GachaExcel gachaCfg)
@@ -355,20 +351,12 @@ public class Gacha_Launch : ICallGSHandler
     }
 
     private static uint GetAttr(PlayerInstance player, uint gid, uint sid) =>
-        player.Data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid)?.Val ?? 0;
+        player.Attributes.GetValue(gid, sid);
 
     private static void SetAttr(PlayerInstance player, NtfSyncPlayer sync, uint gid, uint sid, uint value)
     {
-        var attr = player.Data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
-        if (attr == null)
-        {
-            attr = new PlayerAttr { Gid = gid, Sid = sid };
-            player.Data.Attrs.Add(attr);
-        }
-
-        attr.Val = value;
-        sync.Custom[player.ToPackedAttrKey(gid, sid)] = value;
-        sync.Custom[player.ToShiftedAttrKey(gid, sid)] = value;
+        var attr = player.Attributes.Set(gid, sid, value);
+        player.Attributes.SyncTo(sync, attr);
     }
 
     private static void UpdatePityState(GachaPityState state, GachaRuntimeConfig config, GachaPoolItem item)
@@ -512,7 +500,7 @@ public class Gacha_Launch : ICallGSHandler
     }
 }
 
-internal sealed class GachaLaunchParam
+public sealed class GachaLaunchParam
 {
     [JsonPropertyName("nId")]
     public int NId { get; set; }

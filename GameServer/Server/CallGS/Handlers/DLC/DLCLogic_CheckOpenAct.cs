@@ -1,6 +1,5 @@
 using MikuSB.Data;
 using MikuSB.Data.Excel;
-using MikuSB.Database.Player;
 using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using System.Globalization;
@@ -9,22 +8,21 @@ using System.Text.Json.Nodes;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.DLC;
 
 [CallGSApi("DLCLogic_CheckOpenAct")]
-public class DLCLogic_CheckOpenAct : ICallGSHandler
+public class DLCLogic_CheckOpenAct : CallGSHandler
 {
-    private const uint GroupId = 15;
-    private const uint ActIdSid = 1;
+    private const uint GroupId = AttrIds.Dlc.Gid;
+    private const uint ActIdSid = AttrIds.Dlc.ActIdSid;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
         var now = DateTime.Now;
         var act = ResolveCurrent(GameData.DlcActivityData.Values, now);
         if (act == null)
         {
-            await CallGSRouter.SendScript(connection, "DLCLogic_CheckOpenAct", "{\"bOpen\":false}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{\"bOpen\":false}"));
         }
 
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         var sync = new NtfSyncPlayer();
         SetAttr(player, ActIdSid, act.Id, sync);
 
@@ -36,7 +34,7 @@ public class DLCLogic_CheckOpenAct : ICallGSHandler
             ["nEndTime"] = ToUnixSeconds(ParseConfigTime(act.CloseEndTime))
         };
 
-        await CallGSRouter.SendScript(connection, "DLCLogic_CheckOpenAct", response.ToJsonString(), sync);
+        return Task.FromResult(CallGSResult.Ok(response.ToJsonString(), sync));
     }
 
     private static DlcActivityExcel? ResolveCurrent(IEnumerable<DlcActivityExcel> configs, DateTime now)
@@ -86,27 +84,11 @@ public class DLCLogic_CheckOpenAct : ICallGSHandler
 
     private static void SetAttr(PlayerInstance player, uint sid, uint value, NtfSyncPlayer sync)
     {
-        var attr = GetOrCreateAttr(player, sid);
+        var attr = player.Attributes.GetOrCreate(GroupId, sid);
         if (attr.Val != value)
         {
             attr.Val = value;
-            sync.Custom[player.ToPackedAttrKey(GroupId, sid)] = value;
-            sync.Custom[player.ToShiftedAttrKey(GroupId, sid)] = value;
+            player.Attributes.SyncTo(sync, attr);
         }
-    }
-
-    private static PlayerAttr GetOrCreateAttr(PlayerInstance player, uint sid)
-    {
-        var attr = player.Data.Attrs.FirstOrDefault(x => x.Gid == GroupId && x.Sid == sid);
-        if (attr != null)
-            return attr;
-
-        attr = new PlayerAttr
-        {
-            Gid = GroupId,
-            Sid = sid
-        };
-        player.Data.Attrs.Add(attr);
-        return attr;
     }
 }

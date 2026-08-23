@@ -8,25 +8,23 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.DreamCard;
 
 [CallGSApi("DreamCard_EnterLevel")]
-public class DreamCard_EnterLevel : ICallGSHandler
+public class DreamCard_EnterLevel : CallGSHandler<DreamCardEnterLevelParam>
 {
     private static readonly Random Random = new();
     private static readonly Lazy<DreamCardLevelIndex?> LevelIndex = new(LoadLevelIndex);
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, DreamCardEnterLevelParam req)
     {
-        var req = JsonSerializer.Deserialize<DreamCardEnterLevelParam>(param);
+
         if (req == null || req.LevelId <= 0 || req.Diff <= 0 || req.Type is < 1 or > 3)
         {
-            await CallGSRouter.SendScript(connection, "DreamCard_EnterLevel", "null");
-            return;
+            return Task.FromResult(CallGSResult.Ok("null"));
         }
 
         var now = DateTime.Now;
         if (!IsAllowed(req, now))
         {
-            await CallGSRouter.SendScript(connection, "DreamCard_EnterLevel", "null");
-            return;
+            return Task.FromResult(CallGSResult.Ok("null"));
         }
 
         var response = new JsonObject
@@ -37,7 +35,7 @@ public class DreamCard_EnterLevel : ICallGSHandler
             ["nType"] = req.Type
         };
 
-        await CallGSRouter.SendScript(connection, "DreamCard_EnterLevel", response.ToJsonString());
+        return Task.FromResult(CallGSResult.Ok(response.ToJsonString()));
     }
 
     private static bool IsAllowed(DreamCardEnterLevelParam req, DateTime now)
@@ -83,7 +81,7 @@ public class DreamCard_EnterLevel : ICallGSHandler
     }
 }
 
-internal sealed class DreamCardEnterLevelParam
+public sealed class DreamCardEnterLevelParam
 {
     [JsonPropertyName("nID")]
     public int LevelId { get; set; }

@@ -2,7 +2,6 @@ using MikuSB.Data;
 using MikuSB.Data.Excel;
 using MikuSB.Database;
 using MikuSB.Database.Inventory;
-using MikuSB.Database.Player;
 using MikuSB.Enums.Item;
 using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
@@ -14,64 +13,58 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Tower;
 
 [CallGSApi("ClimbTowerLogic_GetReward")]
-public class ClimbTowerLogic_GetReward : ICallGSHandler
+public class ClimbTowerLogic_GetReward : CallGSHandler<ClimbTowerGetRewardParam>
 {
-    private const uint TowerGroupId = 3;
-    private const uint RewardStateSidBase = 100;
-    private const uint TowerLevelStateSidBase = 10000;
-    private const uint LaunchPassGroupId = 22;
-    private const uint AdvancedDiffSid = 4;
+    private const uint TowerGroupId = AttrIds.Tower.Gid;
+    private const uint RewardStateSidBase = AttrIds.Tower.RewardStateSidBase;
+    private const uint TowerLevelStateSidBase = AttrIds.Tower.LevelStateSidBase;
+    private const uint LaunchPassGroupId = AttrIds.Tower.PassGid;
+    private const uint AdvancedDiffSid = AttrIds.Tower.DiffSid;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override async Task<CallGSResult> HandleAsync(CallGSContext context, ClimbTowerGetRewardParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<ClimbTowerGetRewardParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.Layer <= 0)
         {
-            await CallGSRouter.SendScript(connection, "ClimbTowerLogic_GetReward", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         var cycle = ResolveCurrentCycle(GameData.ClimbTowerTimeData.Values, DateTime.Now);
         if (cycle == null)
         {
-            await CallGSRouter.SendScript(connection, "ClimbTowerLogic_GetReward", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
-        if (!TryResolveLayer(cycle, req.Layer, player.Data, out var towerIds, out var diff))
+        if (!TryResolveLayer(cycle, req.Layer, player, out var towerIds, out var diff))
         {
-            await CallGSRouter.SendScript(connection, "ClimbTowerLogic_GetReward", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         if (!GameData.ClimbTowerAwardData.TryGetValue((uint)req.Layer, out var diffMap) ||
             !diffMap.TryGetValue(diff, out var rewardCfg))
         {
-            await CallGSRouter.SendScript(connection, "ClimbTowerLogic_GetReward", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         var groups = ResolveRequestedGroups(req.Group);
         if (groups.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "ClimbTowerLogic_GetReward", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         var claimableGroups = groups
-            .Where(group => CanClaimGroup(player.Data, rewardCfg, towerIds, req.Layer, group))
+            .Where(group => CanClaimGroup(player, rewardCfg, towerIds, req.Layer, group))
             .Distinct()
             .ToList();
 
         if (claimableGroups.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "ClimbTowerLogic_GetReward", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         var sync = new NtfSyncPlayer();
-        var rewardStateAttr = GetOrCreateAttr(player.Data, TowerGroupId, RewardStateSidBase + (uint)req.Layer);
+        var rewardStateAttr = player.Attributes.GetOrCreate(TowerGroupId, RewardStateSidBase + (uint)req.Layer);
         var responseRewards = new JsonArray();
 
         foreach (var group in claimableGroups)
@@ -93,7 +86,7 @@ public class ClimbTowerLogic_GetReward : ICallGSHandler
             }
         }
 
-        SyncAttr(sync, player, rewardStateAttr);
+        player.Attributes.SyncTo(sync, rewardStateAttr);
         DatabaseHelper.SaveDatabaseType(player.Data);
         DatabaseHelper.SaveDatabaseType(player.InventoryManager.InventoryData);
         DatabaseHelper.SaveDatabaseType(player.CharacterManager.CharacterData);
@@ -103,7 +96,7 @@ public class ClimbTowerLogic_GetReward : ICallGSHandler
             ["tbRewards"] = responseRewards
         };
 
-        await CallGSRouter.SendScript(connection, "ClimbTowerLogic_GetReward", rsp.ToJsonString(), sync);
+        return CallGSResult.Ok(rsp.ToJsonString(), sync);
     }
 
     private static async Task GrantRewardAsync(PlayerInstance player, NtfSyncPlayer sync, IReadOnlyList<uint> reward)
@@ -243,7 +236,7 @@ public class ClimbTowerLogic_GetReward : ICallGSHandler
     private static BaseGameItemInfo? AddOtherItem(InventoryData inventory, uint genre, uint detail, uint particular, uint level, uint count)
     {
         var templateId = GameResourceTemplateId.FromGdpl(genre, detail, particular, level);
-        if (!GameData.OtherItemData.TryGetValue((uint)templateId, out var otherItem))
+        if (!GameData.OtherItemData.TryGetValue(templateId, out var otherItem))
             return null;
 
         var maxCount = otherItem.GMnum > 0 ? otherItem.GMnum : 99999u;
@@ -266,44 +259,42 @@ public class ClimbTowerLogic_GetReward : ICallGSHandler
     }
 
     private static bool CanClaimGroup(
-        PlayerGameData data,
+        PlayerInstance player,
         ClimbTowerAwardExcel rewardCfg,
         IReadOnlyList<uint> towerIds,
         int layer,
         int group)
     {
-        if (group is < 0 or > 3 || IsRewardClaimed(data, layer, group))
+        if (group is < 0 or > 3 || IsRewardClaimed(player, layer, group))
             return false;
 
         if (group == 0)
-            return IsLayerPass(data, towerIds);
+            return IsLayerPass(player, towerIds);
 
         var requiredStar = rewardCfg.GetStarCount(group);
-        return requiredStar > 0 && GetLayerStar(data, towerIds) >= requiredStar;
+        return requiredStar > 0 && GetLayerStar(player, towerIds) >= requiredStar;
     }
 
-    private static bool IsLayerPass(PlayerGameData data, IReadOnlyList<uint> towerIds)
+    private static bool IsLayerPass(PlayerInstance player, IReadOnlyList<uint> towerIds)
     {
         foreach (var towerId in towerIds)
         {
             if (!GameData.ClimbTowerLevelOrderData.TryGetValue(towerId, out var orderCfg))
                 return false;
 
-            var passAttr = data.Attrs.FirstOrDefault(x => x.Gid == LaunchPassGroupId && x.Sid == orderCfg.LevelID);
-            if (passAttr == null || passAttr.Val == 0)
+            if (player.Attributes.GetValue(LaunchPassGroupId, orderCfg.LevelID) == 0)
                 return false;
         }
 
         return true;
     }
 
-    private static int GetLayerStar(PlayerGameData data, IReadOnlyList<uint> towerIds)
+    private static int GetLayerStar(PlayerInstance player, IReadOnlyList<uint> towerIds)
     {
         var total = 0;
         foreach (var towerId in towerIds)
         {
-            var attr = data.Attrs.FirstOrDefault(x => x.Gid == TowerGroupId && x.Sid == TowerLevelStateSidBase + towerId);
-            var value = attr?.Val ?? 0;
+            var value = player.Attributes.GetValue(TowerGroupId, TowerLevelStateSidBase + towerId);
             for (var i = 0; i < 9; i++)
             {
                 if (((value >> i) & 1u) != 0)
@@ -314,14 +305,10 @@ public class ClimbTowerLogic_GetReward : ICallGSHandler
         return total;
     }
 
-    private static bool IsRewardClaimed(PlayerGameData data, int layer, int group)
+    private static bool IsRewardClaimed(PlayerInstance player, int layer, int group)
     {
-        var attr = data.Attrs.FirstOrDefault(x => x.Gid == TowerGroupId && x.Sid == RewardStateSidBase + (uint)layer);
-        if (attr == null)
-            return false;
-
         var offset = GetFlagBitOffset(group);
-        return ((attr.Val >> offset) & 0xFu) > 0;
+        return ((player.Attributes.GetValue(TowerGroupId, RewardStateSidBase + (uint)layer) >> offset) & 0xFu) > 0;
     }
 
     private static int GetFlagBitOffset(int group) => group switch
@@ -344,7 +331,7 @@ public class ClimbTowerLogic_GetReward : ICallGSHandler
     private static bool TryResolveLayer(
         ClimbTowerTimeExcel cycle,
         int layer,
-        PlayerGameData data,
+        PlayerInstance player,
         out IReadOnlyList<uint> towerIds,
         out int diff)
     {
@@ -365,8 +352,7 @@ public class ClimbTowerLogic_GetReward : ICallGSHandler
             return false;
         }
 
-        var diffAttr = data.Attrs.FirstOrDefault(x => x.Gid == TowerGroupId && x.Sid == AdvancedDiffSid);
-        diff = (int)(diffAttr?.Val ?? 0);
+        diff = (int)player.Attributes.GetValue(TowerGroupId, AdvancedDiffSid);
         towerIds = advancedGroups[advancedIndex - 1];
         return diff > 0 && towerIds.Count > 0;
     }
@@ -414,29 +400,9 @@ public class ClimbTowerLogic_GetReward : ICallGSHandler
             : null;
     }
 
-    private static PlayerAttr GetOrCreateAttr(PlayerGameData data, uint gid, uint sid)
-    {
-        var attr = data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
-        if (attr != null)
-            return attr;
-
-        attr = new PlayerAttr
-        {
-            Gid = gid,
-            Sid = sid
-        };
-        data.Attrs.Add(attr);
-        return attr;
-    }
-
-    private static void SyncAttr(NtfSyncPlayer sync, PlayerInstance player, PlayerAttr attr)
-    {
-        sync.Custom[player.ToPackedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-        sync.Custom[player.ToShiftedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-    }
 }
 
-internal sealed class ClimbTowerGetRewardParam
+public sealed class ClimbTowerGetRewardParam
 {
     [JsonPropertyName("nType")]
     public int? Type { get; set; }

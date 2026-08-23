@@ -1,6 +1,5 @@
 using MikuSB.Data;
 using MikuSB.Data.Excel;
-using MikuSB.Database.Player;
 using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using System.Globalization;
@@ -9,23 +8,22 @@ using System.Text.Json.Nodes;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.BattlePass;
 
 [CallGSApi("BattlePassLogic_ClientRefresh")]
-public class BattlePassLogic_ClientRefresh : ICallGSHandler
+public class BattlePassLogic_ClientRefresh : CallGSHandler
 {
-    private const uint GroupId = 25;
-    private const uint CurIdSid = 1;
+    private const uint GroupId = AttrIds.BattlePass.Gid;
+    private const uint CurIdSid = AttrIds.BattlePass.CurrentIdSid;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
         var now = DateTime.Now;
         var battlePass = ResolveCurrent(GameData.BattlePassTimeData.Values, now);
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         var sync = new NtfSyncPlayer();
 
         if (battlePass == null)
         {
             SetAttr(player, CurIdSid, 0, sync);
-            await CallGSRouter.SendScript(connection, "BattlePassLogic_ClientRefresh", "{}", sync);
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}", sync));
         }
 
         SetAttr(player, CurIdSid, battlePass.Id, sync);
@@ -37,7 +35,7 @@ public class BattlePassLogic_ClientRefresh : ICallGSHandler
             ["nEndTime"] = ToUnixSeconds(ParseConfigTime(battlePass.EndTime))
         };
 
-        await CallGSRouter.SendScript(connection, "BattlePassLogic_ClientRefresh", response.ToJsonString(), sync);
+        return Task.FromResult(CallGSResult.Ok(response.ToJsonString(), sync));
     }
 
     private static BattlePassTimeExcel? ResolveCurrent(IEnumerable<BattlePassTimeExcel> configs, DateTime now)
@@ -87,27 +85,11 @@ public class BattlePassLogic_ClientRefresh : ICallGSHandler
 
     private static void SetAttr(PlayerInstance player, uint sid, uint value, NtfSyncPlayer sync)
     {
-        var attr = GetOrCreateAttr(player, sid);
+        var attr = player.Attributes.GetOrCreate(GroupId, sid);
         if (attr.Val != value)
         {
             attr.Val = value;
-            sync.Custom[player.ToPackedAttrKey(GroupId, sid)] = value;
-            sync.Custom[player.ToShiftedAttrKey(GroupId, sid)] = value;
+            player.Attributes.SyncTo(sync, attr);
         }
-    }
-
-    private static PlayerAttr GetOrCreateAttr(PlayerInstance player, uint sid)
-    {
-        var attr = player.Data.Attrs.FirstOrDefault(x => x.Gid == GroupId && x.Sid == sid);
-        if (attr != null)
-            return attr;
-
-        attr = new PlayerAttr
-        {
-            Gid = GroupId,
-            Sid = sid
-        };
-        player.Data.Attrs.Add(attr);
-        return attr;
     }
 }

@@ -6,25 +6,23 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("GirlWeaponSkin_Change")]
-public class GirlWeaponSkin_Change : ICallGSHandler
+public class GirlWeaponSkin_Change : CallGSHandler<GirlWeaponSkinParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, GirlWeaponSkinParam req)
     {
-        var req = JsonSerializer.Deserialize<GirlWeaponSkinParam>(param);
+
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlWeaponSkin_Change", "{\"err\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{\"err\":\"error.BadParam\"}"));
         }
 
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         var cardData = player.CharacterManager.GetCharacterByGUID(req.CardId);
-        if (cardData == null) return;
+        if (cardData == null) return Task.FromResult(CallGSResult.NoResponse());
         var skinData = player.InventoryManager.GetNormalItem(req.SkinId);
         if (skinData == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlWeaponSkin_Change", "{\"err\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{\"err\":\"error.BadParam\"}"));
         }
 
         cardData.WeaponSkinId = req.SkinId;
@@ -33,11 +31,11 @@ public class GirlWeaponSkin_Change : ICallGSHandler
             Items = { cardData.ToProto() }
         };
 
-        await CallGSRouter.SendScript(connection, "GirlWeaponSkin_Change", "null", sync);
+        return Task.FromResult(CallGSResult.Ok("null", sync));
     }
 }
 
-internal sealed class GirlWeaponSkinParam
+public sealed class GirlWeaponSkinParam
 {
     [JsonPropertyName("nCardId")]
     public uint CardId { get; set; }

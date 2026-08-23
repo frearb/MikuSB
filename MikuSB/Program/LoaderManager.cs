@@ -195,7 +195,8 @@ public class LoaderManager : MikuSB
             return;
         }
         IConsole.OnConsoleExcuteCommand += CommandExecutor.ConsoleExcuteCommand;
-        CommandExecutor.OnRunCommand += (sender, e) => { CommandManager.HandleCommand(e, sender); };
+        CommandExecutor.OnRunCommand += (sender, e) => { _ = CommandManager.HandleCommand(e, sender); };
+        InGameConsoleBridge.ExecuteCommandAsync = InGameConsoleCommandService.ExecuteAsync;
 
         await IConsole.ListenConsole(exitToken);
     }

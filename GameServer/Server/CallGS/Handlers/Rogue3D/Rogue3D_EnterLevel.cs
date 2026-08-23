@@ -4,13 +4,13 @@ namespace MikuSB.GameServer.Server.CallGS.Handlers.Rogue3D;
 // param: {"nDiffId", "nTeamID", "tbTeam", "tbBuffList", "tbLog"}
 // Response: {"nSeed": int}
 [CallGSApi("Rogue3D_EnterLevel")]
-public class Rogue3D_EnterLevel : ICallGSHandler
+public class Rogue3D_EnterLevel : CallGSHandler
 {
     private static readonly Random Random = new();
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
         var seed = Random.Next(1, 1_000_000_000);
-        await CallGSRouter.SendScript(connection, "Rogue3D_EnterLevel", $"{{\"nSeed\":{seed}}}");
+        return Task.FromResult(CallGSResult.Ok($"{{\"nSeed\":{seed}}}"));
     }
 }

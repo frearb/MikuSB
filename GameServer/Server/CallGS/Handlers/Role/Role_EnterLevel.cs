@@ -1,14 +1,37 @@
-﻿namespace MikuSB.GameServer.Server.CallGS.Handlers.Role;
+using System.Text.Json.Serialization;
+using MikuSB.Data;
+using MikuSB.GameServer.Game.Quest;
 
-// Response:{tbRet:{nSeed:random_number}}
+namespace MikuSB.GameServer.Server.CallGS.Handlers.Role;
+
+public sealed class RoleEnterLevelParam
+{
+    [JsonPropertyName("nID")]
+    public uint LevelId { get; set; }
+
+    [JsonPropertyName("nTeamID")]
+    public uint TeamId { get; set; }
+}
+
+// Success response shape expected by Lua: { nSeed = random_number }
 [CallGSApi("Role_EnterLevel")]
-public class Role_EnterLevel : ICallGSHandler
+public class Role_EnterLevel : CallGSHandler<RoleEnterLevelParam>
 {
     private static readonly Random _random = new Random();
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, RoleEnterLevelParam request)
     {
-        string rsp = $"{{\"tbRet\":{{\"nSeed\":{_random.Next(1, 1000000000)}}}}}";
-        await CallGSRouter.SendScript(connection, "Role_EnterLevel", rsp);
+        if (request.LevelId == 0 || request.TeamId == 0 || !GameData.RoleLevelData.ContainsKey(request.LevelId) ||
+            !context.Player.QuestManager.CanEnterLevel(QuestLevelType.Role, request.LevelId))
+        {
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
+        }
+
+        uint seed = (uint)_random.Next(1, 1000000000);
+        context.Player.BeginLevelSession(QuestLevelType.Role, request.LevelId, seed, request.TeamId);
+
+        string rsp = $"{{\"nSeed\":{seed}}}";
+        return Task.FromResult(CallGSResult.Ok(rsp));
     }
+
 }

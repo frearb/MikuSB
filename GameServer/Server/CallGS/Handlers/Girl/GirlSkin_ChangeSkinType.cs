@@ -11,11 +11,11 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("GirlSkin_ChangeSkinType")]
-public class GirlSkin_ChangeSkinType : ICallGSHandler
+public class GirlSkin_ChangeSkinType : CallGSHandler<ChangeSkinTypeParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, ChangeSkinTypeParam req)
     {
-        var req = JsonSerializer.Deserialize<ChangeSkinTypeParam>(param);
+
         var skinType = ClampClientSkinType(req?.Type ?? 0);
         var response = new JsonObject
         {
@@ -24,11 +24,10 @@ public class GirlSkin_ChangeSkinType : ICallGSHandler
         };
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlSkin_ChangeSkinType", response.ToJsonString());
-            return;
+            return Task.FromResult(CallGSResult.Ok(response.ToJsonString()));
         }
 
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         var skinData = GetOrCreateSkinItem(player, req.SkinId);
         if (skinData != null)
             skinData.SkinType = skinType;
@@ -39,8 +38,7 @@ public class GirlSkin_ChangeSkinType : ICallGSHandler
 
         if (skinData == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlSkin_ChangeSkinType", response.ToJsonString());
-            return;
+            return Task.FromResult(CallGSResult.Ok(response.ToJsonString()));
         }
 
         var sync = new NtfSyncPlayer
@@ -48,7 +46,7 @@ public class GirlSkin_ChangeSkinType : ICallGSHandler
             Items = { skinData.ToProto() }
         };
 
-        await CallGSRouter.SendScript(connection, "GirlSkin_ChangeSkinType", response.ToJsonString(), sync);
+        return Task.FromResult(CallGSResult.Ok(response.ToJsonString(), sync));
     }
 
     internal static uint ClampClientSkinType(uint skinType)
@@ -88,7 +86,7 @@ public class GirlSkin_ChangeSkinType : ICallGSHandler
     }
 }
 
-internal sealed class ChangeSkinTypeParam
+public sealed class ChangeSkinTypeParam
 {
     [JsonPropertyName("nType")]
     public uint Type { get; set; }

@@ -8,30 +8,27 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("GirlCard_UpByBreak")]
-public class GirlCard_UpByBreak : ICallGSHandler
+public class GirlCard_UpByBreak : CallGSHandler<GirlCardUpByBreakParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, GirlCardUpByBreakParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<GirlCardUpByBreakParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.CardId == 0 || req.BreakLv <= 0 || req.Materials == null || req.Materials.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpByBreak", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var card = player.CharacterManager.GetCharacterByGUID((uint)req.CardId);
         if (card == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpByBreak", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var expectedBreakLv = card.Break + 1;
         if (req.BreakLv != expectedBreakLv)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpByBreak", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var requestedMaterials = new Dictionary<ulong, uint>();
@@ -54,8 +51,7 @@ public class GirlCard_UpByBreak : ICallGSHandler
 
         if (requestedMaterials.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_UpByBreak", "{\"sErr\":\"tip.not_material_for_break\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("tip.not_material_for_break"));
         }
 
         var syncItems = new List<Item>();
@@ -64,8 +60,7 @@ public class GirlCard_UpByBreak : ICallGSHandler
             var item = player.InventoryManager.InventoryData.Items.Values.FirstOrDefault(x => x.TemplateId == templateId);
             if (item == null || item.ItemCount < count)
             {
-                await CallGSRouter.SendScript(connection, "GirlCard_UpByBreak", "{\"sErr\":\"tip.not_material_for_break\"}");
-                return;
+                return Task.FromResult(CallGSResult.Error("tip.not_material_for_break"));
             }
         }
 
@@ -94,7 +89,7 @@ public class GirlCard_UpByBreak : ICallGSHandler
         var sync = new NtfSyncPlayer();
         sync.Items.AddRange(syncItems);
 
-        await CallGSRouter.SendScript(connection, "GirlCard_UpByBreak", "{}", sync);
+        return Task.FromResult(CallGSResult.Ok("{}", sync));
     }
 
     private static Item BuildRemovedProto(BaseGameItemInfo item)
@@ -105,7 +100,7 @@ public class GirlCard_UpByBreak : ICallGSHandler
     }
 }
 
-internal sealed class GirlCardUpByBreakParam
+public sealed class GirlCardUpByBreakParam
 {
     [JsonPropertyName("pId")]
     public int CardId { get; set; }

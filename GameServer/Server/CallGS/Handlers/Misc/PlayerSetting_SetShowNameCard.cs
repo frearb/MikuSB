@@ -7,20 +7,18 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Misc;
 
 [CallGSApi("PlayerSetting_SetShowNameCard")]
-public class PlayerSetting_SetShowNameCard : ICallGSHandler
+public class PlayerSetting_SetShowNameCard : CallGSHandler<SetShowNameCardParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SetShowNameCardParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<SetShowNameCardParam>(param);
-        if (req == null)
-            return;
+        var player = context.Connection.Player!;
 
+        if (req == null)
+            return Task.FromResult(CallGSResult.NoResponse());
         var item = player.InventoryManager.GetNormalItem(req.Id);
         if (item == null)
         {
-            await CallGSRouter.SendScript(connection, "PlayerSetting_SetShowNameCard", "{\"err\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{\"err\":\"error.BadParam\"}"));
         }
 
         player.SetShowItem((int)ProfileShowItemTypeEnum.SHOWITEM_NAMECARD, item.UniqueId);
@@ -28,11 +26,11 @@ public class PlayerSetting_SetShowNameCard : ICallGSHandler
 
         var sync = new NtfSyncPlayer();
         sync.ShowItems.AddRange(player.Data.ShowItems);
-        await CallGSRouter.SendScript(connection, "PlayerSetting_SetShowNameCard", "null", sync);
+        return Task.FromResult(CallGSResult.Ok("null", sync));
     }
 }
 
-internal sealed class SetShowNameCardParam
+public sealed class SetShowNameCardParam
 {
     [JsonPropertyName("nID")]
     public uint Id { get; set; }

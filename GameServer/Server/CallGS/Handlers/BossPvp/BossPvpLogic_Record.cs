@@ -3,11 +3,11 @@ using MikuSB.GameServer.Game.BossPvp;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.BossPvp;
 
 [CallGSApi("BossPvpLogic_Record")]
-public class BossPvpLogic_Record : ICallGSHandler
+public class BossPvpLogic_Record : CallGSHandler
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
-        var (response, sync) = BossPvpService.HandleRecord(connection.Player!, param);
-        await CallGSRouter.SendScript(connection, "BossPvpLogic_Record", System.Text.Json.JsonSerializer.Serialize(response), sync);
+        var (response, sync) = BossPvpService.HandleRecord(context.Connection.Player!, param);
+        return Task.FromResult(CallGSResult.Ok(System.Text.Json.JsonSerializer.Serialize(response), sync));
     }
 }

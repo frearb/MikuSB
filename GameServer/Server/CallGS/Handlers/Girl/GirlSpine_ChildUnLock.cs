@@ -1,6 +1,6 @@
 using MikuSB.Data;
 using MikuSB.Database;
-using MikuSB.Database.Player;
+using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,33 +10,30 @@ namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 // Spine node encoding: (MastIdx << 8) | SubIdx stored as uint in CharacterInfo.Spines
 // GetStrAttribute(Gid=30, Sid=Detail) stores JSON: { "<Particular>": { "ns": <MastIdx>, "tbn": [0,0], "tbr": [] } }
 [CallGSApi("GirlSpine_ChildUnLock")]
-public class GirlSpine_ChildUnLock : ICallGSHandler
+public class GirlSpine_ChildUnLock : CallGSHandler<ChildUnLockParam>
 {
-    private const uint SpineStrAttrGid = 30;
+    private const uint SpineStrAttrGid = AttrIds.Girl.SpineStringGid;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override async Task<CallGSResult> HandleAsync(CallGSContext context, ChildUnLockParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<ChildUnLockParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.CardId == 0 || req.Info == null || req.Materials == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlSpine_ChildUnLock", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         var card = player.CharacterManager.GetCharacterByGUID((uint)req.CardId);
         if (card == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlSpine_ChildUnLock", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         var mastIdx = req.Info.Indx;
         var subIdx = req.Info.InSubIdx;
         if (mastIdx <= 0 || subIdx <= 0)
         {
-            await CallGSRouter.SendScript(connection, "GirlSpine_ChildUnLock", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return CallGSResult.Error("error.BadParam");
         }
 
         // Spines[MastIdx-1] is a bitmask; bit (SubIdx-1) = 1 means that sub-node is unlocked.
@@ -49,8 +46,7 @@ public class GirlSpine_ChildUnLock : ICallGSHandler
 
         if ((card.Spines[spineListIdx] & spineBit) != 0)
         {
-            await CallGSRouter.SendScript(connection, "GirlSpine_ChildUnLock", "{\"sErr\":\"tip.girlcard_alread_break\"}");
-            return;
+            return CallGSResult.Error("tip.girlcard_alread_break");
         }
 
         // Consume materials
@@ -74,8 +70,7 @@ public class GirlSpine_ChildUnLock : ICallGSHandler
             var item = player.InventoryManager.InventoryData.Items.Values.FirstOrDefault(x => x.TemplateId == tid);
             if (item == null || item.ItemCount < count)
             {
-                await CallGSRouter.SendScript(connection, "GirlSpine_ChildUnLock", "{\"sErr\":\"tip.not_material\"}");
-                return;
+                return CallGSResult.Error("tip.not_material");
             }
         }
 
@@ -101,34 +96,30 @@ public class GirlSpine_ChildUnLock : ICallGSHandler
         var cardParticular = (uint)((card.TemplateId >> 32) & 0xFFFF);
 
         // Build and persist StrAttr JSON: { "<particular>": { "ns": mastIdx, "tbn": [0,0], "tbr": [] } }
-        UpdateSpineStrAttr(player.Data, cardDetail, cardParticular, mastIdx);
+        UpdateSpineStrAttr(player, cardDetail, cardParticular, mastIdx);
 
         DatabaseHelper.SaveDatabaseType(player.InventoryManager.InventoryData);
         DatabaseHelper.SaveDatabaseType(player.CharacterManager.CharacterData);
         DatabaseHelper.SaveDatabaseType(player.Data);
 
         // Send NtfSetStrAttr so client's GetStrAttribute(30, Detail) returns fresh data
-        var strAttrData = GetSpineStrAttrJson(player.Data, cardDetail);
+        var strAttrData = GetSpineStrAttrJson(player, cardDetail);
         var ntfStrAttr = new NtfSetStrAttr { Gid = SpineStrAttrGid, Sid = cardDetail, Val = strAttrData };
-        await connection.Player!.SendPacket(CmdIds.NtfSetStrAttr, ntfStrAttr);
+        await context.Connection.Player!.SendPacket(CmdIds.NtfSetStrAttr, ntfStrAttr);
 
         var sync = new NtfSyncPlayer();
         sync.Items.AddRange(syncItems);
 
         var rsp = $"{{\"tb\":{{\"D\":{cardDetail},\"pId\":{req.CardId},\"MastIdx\":{mastIdx},\"SubIdx\":{subIdx}}}}}";
-        await CallGSRouter.SendScript(connection, "GirlSpine_ChildUnLock", rsp, sync);
+        return CallGSResult.Ok(rsp, sync);
     }
 
-    private static void UpdateSpineStrAttr(PlayerGameData data, uint detail, uint particular, int mastIdx)
+    private static void UpdateSpineStrAttr(PlayerInstance player, uint detail, uint particular, int mastIdx)
     {
-        var existing = data.StrAttrs.FirstOrDefault(x => x.Gid == SpineStrAttrGid && x.Sid == detail);
-        if (existing == null)
-        {
-            existing = new PlayerStrAttr { Gid = SpineStrAttrGid, Sid = detail, Val = "{}" };
-            data.StrAttrs.Add(existing);
-        }
+        var existing = player.Attributes.GetString(SpineStrAttrGid, detail);
+        var raw = existing?.Val ?? "{}";
 
-        var root = JsonSerializer.Deserialize<Dictionary<string, SpineStrData>>(existing.Val)
+        var root = JsonSerializer.Deserialize<Dictionary<string, SpineStrData>>(raw)
                    ?? new Dictionary<string, SpineStrData>();
 
         var key = particular.ToString();
@@ -138,17 +129,17 @@ public class GirlSpine_ChildUnLock : ICallGSHandler
         entry.Ns = mastIdx;
         root[key] = entry;
 
-        existing.Val = JsonSerializer.Serialize(root);
+        player.Attributes.SetString(SpineStrAttrGid, detail, JsonSerializer.Serialize(root));
     }
 
-    private static string GetSpineStrAttrJson(PlayerGameData data, uint detail)
+    private static string GetSpineStrAttrJson(PlayerInstance player, uint detail)
     {
-        var existing = data.StrAttrs.FirstOrDefault(x => x.Gid == SpineStrAttrGid && x.Sid == detail);
+        var existing = player.Attributes.GetString(SpineStrAttrGid, detail);
         return existing?.Val ?? "{}";
     }
 }
 
-internal sealed class ChildUnLockParam
+public sealed class ChildUnLockParam
 {
     [JsonPropertyName("pId")]
     public int CardId { get; set; }
@@ -160,7 +151,7 @@ internal sealed class ChildUnLockParam
     public List<List<int>> Materials { get; set; } = [];
 }
 
-internal sealed class NodeInfo
+public sealed class NodeInfo
 {
     [JsonPropertyName("Indx")]
     public int Indx { get; set; }

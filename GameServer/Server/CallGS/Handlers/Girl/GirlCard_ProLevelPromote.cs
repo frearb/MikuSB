@@ -6,31 +6,28 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("GirlCard_ProLevelPromote")]
-public class GirlCard_ProLevelPromote : ICallGSHandler
+public class GirlCard_ProLevelPromote : CallGSHandler<ProLevelPromoteParam>
 {
     private const uint MaxProLevel = 3;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, ProLevelPromoteParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<ProLevelPromoteParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.CardId == 0)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_ProLevelPromote", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var card = player.CharacterManager.GetCharacterByGUID((uint)req.CardId);
         if (card == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_ProLevelPromote", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         if (card.ProLevel >= MaxProLevel)
         {
-            await CallGSRouter.SendScript(connection, "GirlCard_ProLevelPromote", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         card.ProLevel++;
@@ -41,11 +38,11 @@ public class GirlCard_ProLevelPromote : ICallGSHandler
         sync.Items.Add(card.ToProto());
 
         // s2c callback takes no params — return empty arg
-        await CallGSRouter.SendScript(connection, "GirlCard_ProLevelPromote", "{}", sync);
+        return Task.FromResult(CallGSResult.Ok("{}", sync));
     }
 }
 
-internal sealed class ProLevelPromoteParam
+public sealed class ProLevelPromoteParam
 {
     [JsonPropertyName("nID")]
     public int CardId { get; set; }

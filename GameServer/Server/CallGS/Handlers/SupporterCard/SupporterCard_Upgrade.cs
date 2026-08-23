@@ -8,23 +8,21 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.SupporterCard;
 
 [CallGSApi("SupporterCard_Upgrade")]
-public class SupporterCard_Upgrade : ICallGSHandler
+public class SupporterCard_Upgrade : CallGSHandler<SupporterCardUpgradeParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SupporterCardUpgradeParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<SupporterCardUpgradeParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.SupportCardUid == 0 || req.Materials == null || req.Materials.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "Logistics_Upgrade", "{}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}", "Logistics_Upgrade"));
         }
 
         var supportCard = player.InventoryManager.GetSupportCardItem((uint)req.SupportCardUid);
         if (supportCard == null)
         {
-            await CallGSRouter.SendScript(connection, "Logistics_Upgrade", "{}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}", "Logistics_Upgrade"));
         }
 
         var supportCardExcel = GameData.SupportCardData.FirstOrDefault(x => x.TemplateId == supportCard.TemplateId);
@@ -36,8 +34,7 @@ public class SupporterCard_Upgrade : ICallGSHandler
             var item = player.InventoryManager.InventoryData.Items.GetValueOrDefault((uint)mat.Id);
             if (item == null || item.ItemCount < mat.Num)
             {
-                await CallGSRouter.SendScript(connection, "Logistics_Upgrade", "{}");
-                return;
+                return Task.FromResult(CallGSResult.Ok("{}", "Logistics_Upgrade"));
             }
         }
 
@@ -106,7 +103,7 @@ public class SupporterCard_Upgrade : ICallGSHandler
         var sync = new NtfSyncPlayer();
         sync.Items.AddRange(syncItems);
 
-        await CallGSRouter.SendScript(connection, "Logistics_Upgrade", "{}", sync);
+        return Task.FromResult(CallGSResult.Ok("{}", sync, "Logistics_Upgrade"));
     }
 
     private static uint GetExpNeeded(uint level)
@@ -117,7 +114,7 @@ public class SupporterCard_Upgrade : ICallGSHandler
     }
 }
 
-internal sealed class SupporterCardUpgradeParam
+public sealed class SupporterCardUpgradeParam
 {
     [JsonPropertyName("Id")]
     public int SupportCardUid { get; set; }
@@ -126,7 +123,7 @@ internal sealed class SupporterCardUpgradeParam
     public List<UpgradeMaterial> Materials { get; set; } = [];
 }
 
-internal sealed class UpgradeMaterial
+public sealed class UpgradeMaterial
 {
     [JsonPropertyName("Id")]
     public int Id { get; set; }

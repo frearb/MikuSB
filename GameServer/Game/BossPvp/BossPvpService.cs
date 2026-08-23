@@ -13,11 +13,11 @@ namespace MikuSB.GameServer.Game.BossPvp;
 
 internal static class BossPvpService
 {
-    private const uint GroupId = 51;
-    private const uint ActivitySubId = 0;
-    private const uint ChallengeNumSid = 1;
+    private const uint GroupId = AttrIds.BossPvp.Gid;
+    private const uint ActivitySubId = AttrIds.BossPvp.ActivitySid;
+    private const uint ChallengeNumSid = AttrIds.BossPvp.ChallengeNumSid;
     private const uint DiffStartId = 10;
-    private const uint LevelStartSid = 100;
+    private const uint LevelStartSid = AttrIds.BossPvp.LevelStartSid;
     private const uint LevelStride = 10;
     private const uint BossLineup1 = 15;
     private const uint BossLineup2 = 16;
@@ -443,13 +443,13 @@ internal static class BossPvpService
 
     private static int ReadInt(PlayerInstance player, uint sid)
     {
-        var attr = player.Data.StrAttrs.FirstOrDefault(x => x.Gid == GroupId && x.Sid == sid)?.Val;
+        var attr = player.Attributes.GetStringValue(GroupId, sid);
         return int.TryParse(attr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value) ? value : 0;
     }
 
     private static void EnsureStr(PlayerInstance player, uint sid, string value, NtfSyncPlayer sync)
     {
-        var attr = player.Data.StrAttrs.FirstOrDefault(x => x.Gid == GroupId && x.Sid == sid);
+        var attr = player.Attributes.GetString(GroupId, sid);
         if (attr != null)
         {
             return;
@@ -460,8 +460,8 @@ internal static class BossPvpService
 
     private static void SetStr(PlayerInstance player, uint sid, string value, NtfSyncPlayer sync)
     {
-        player.SetStrAttr(GroupId, sid, value);
-        sync.CustomStr[player.ToShiftedAttrKey(GroupId, sid)] = value;
+        var attr = player.Attributes.SetString(GroupId, sid, value);
+        player.Attributes.SyncTo(sync, attr);
     }
 
     private static uint GetBossSid(uint bossLevelId, uint offset) => (LevelStride * bossLevelId) + LevelStartSid + offset;

@@ -95,6 +95,9 @@ public class LoaderOptions
 {
     public string GamePath { get; set; } = "";
     public string[] PatchPaths { get; set; } = [@"Patch\MikuSB-Patch.dll"];
+    public bool EnableInGameConsole { get; set; } = true;
+    public bool AutoUpdateInGameConsole { get; set; } = true;
+    public string InGameConsoleLoaderPath { get; set; } = @"Patch\MikuSB-InGame-GUI-Console.Loader.dll";
     public string[] Arguments { get; set; } = ["-FeatureLevelES31", "-channelid=seasun", "-NoSplash"];
     public bool SetAllProxy { get; set; } = true;
 }

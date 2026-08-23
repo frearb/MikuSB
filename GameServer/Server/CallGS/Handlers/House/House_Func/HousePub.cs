@@ -8,7 +8,7 @@ public class PubGameEnter : IHouseFuncHandler
 {
     private static readonly Random Random = new();
 
-    public async Task Handle(Connection connection, string param)
+    public Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var rsp = new JsonObject
         {
@@ -18,17 +18,17 @@ public class PubGameEnter : IHouseFuncHandler
             ["bIsGuide"] = false,
             ["bHasTry"] = false
         };
-        await CallGSRouter.SendScript(connection, "House_Request", rsp.ToJsonString());
+        return Task.FromResult(CallGSResult.Ok(rsp.ToJsonString()));
     }
 }
 
 [HouseFunc("PubGameMulExit")]
 public class PubGameMulExit : IHouseFuncHandler
 {
-    public async Task Handle(Connection connection, string param)
+    public Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var rsp = new JsonObject { ["FuncName"] = "PubGameMulExit" };
-        await CallGSRouter.SendScript(connection, "House_Request", rsp.ToJsonString());
+        return Task.FromResult(CallGSResult.Ok(rsp.ToJsonString()));
     }
 }
 
@@ -36,39 +36,39 @@ public class PubGameMulExit : IHouseFuncHandler
 [HouseFunc("PubGameSettlement")]
 public class PubGameSettlement : IHouseFuncHandler
 {
-    public async Task Handle(Connection connection, string param)
+    public Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var rsp = new JsonObject { ["FuncName"] = "PubGameSettlement", ["nAddExp"] = 0 };
-        await CallGSRouter.SendScript(connection, "House_Request", rsp.ToJsonString());
+        return Task.FromResult(CallGSResult.Ok(rsp.ToJsonString()));
     }
 }
 
 [HouseFunc("PubGameGetReward")]
 public class PubGameGetReward : IHouseFuncHandler
 {
-    public async Task Handle(Connection connection, string param)
+    public Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var rsp = new JsonObject { ["FuncName"] = "PubGameGetReward" };
-        await CallGSRouter.SendScript(connection, "House_Request", rsp.ToJsonString());
+        return Task.FromResult(CallGSResult.Ok(rsp.ToJsonString()));
     }
 }
 
 [HouseFunc("PubGameGetAchReward")]
 public class PubGameGetAchReward : IHouseFuncHandler
 {
-    public async Task Handle(Connection connection, string param)
+    public Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var rsp = new JsonObject { ["FuncName"] = "PubGameGetAchReward" };
-        await CallGSRouter.SendScript(connection, "House_Request", rsp.ToJsonString());
+        return Task.FromResult(CallGSResult.Ok(rsp.ToJsonString()));
     }
 }
 
 [HouseFunc("PubGameAchievementFinish")]
 public class PubGameAchievementFinish : IHouseFuncHandler
 {
-    public async Task Handle(Connection connection, string param)
+    public Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var rsp = new JsonObject { ["FuncName"] = "PubGameAchievementFinish" };
-        await CallGSRouter.SendScript(connection, "House_Request", rsp.ToJsonString());
+        return Task.FromResult(CallGSResult.Ok(rsp.ToJsonString()));
     }
 }

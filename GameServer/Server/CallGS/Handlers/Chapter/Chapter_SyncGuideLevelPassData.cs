@@ -1,13 +1,15 @@
+using System.Text.Json.Nodes;
+using MikuSB.GameServer.Game.Quest;
+using MikuSB.GameServer.Server.CallGS;
+
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Chapter;
 
-// Client syncs completed guide level data to the server. No response required.
-// param: {tbData = [{nLevelID, passTime}, ...]}
 [CallGSApi("Chapter_SyncGuideLevelPassData")]
-public class Chapter_SyncGuideLevelPassData : ICallGSHandler
+public class Chapter_SyncGuideLevelPassData : CallGSHandler<JsonNode>
 {
-    public Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, JsonNode request)
     {
-        // TODO: persist guide level pass data to player save
-        return Task.CompletedTask;
+        context.Player.QuestManager.SyncGuideLevelPassData(request);
+        return Task.FromResult(CallGSResult.NoResponse());
     }
 }

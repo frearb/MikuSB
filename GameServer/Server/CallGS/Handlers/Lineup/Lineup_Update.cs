@@ -5,28 +5,26 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Lineup;
 
 [CallGSApi("Lineup_Update")]
-public class Lineup_Update : ICallGSHandler
+public class Lineup_Update : CallGSHandler<LineupUpdateParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override async Task<CallGSResult> HandleAsync(CallGSContext context, LineupUpdateParam req)
     {
-        var req = JsonSerializer.Deserialize<LineupUpdateParam>(param);
+
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "UpdateLineup", "{}");
-            return;
+            return CallGSResult.Ok("{}", "UpdateLineup");
         }
 
-        var formation = await connection.Player!.LineupManager.UpdateLineup(req.Index,req.Member1,req.Member2,req.Member3);
+        var formation = await context.Connection.Player!.LineupManager.UpdateLineup(req.Index,req.Member1,req.Member2,req.Member3);
         if (formation == null)
         {
-            await CallGSRouter.SendScript(connection, "UpdateLineup", "{}");
-            return;
+            return CallGSResult.Ok("{}", "UpdateLineup");
         }
-        await CallGSRouter.SendScript(connection, "UpdateLineup", "{}");
+        return CallGSResult.Ok("{}", "UpdateLineup");
     }
 }
 
-internal sealed class LineupUpdateParam
+public sealed class LineupUpdateParam
 {
     [JsonPropertyName("name")] public string Name { get; set; } = "";
     [JsonPropertyName("index")] public int Index { get; set; }

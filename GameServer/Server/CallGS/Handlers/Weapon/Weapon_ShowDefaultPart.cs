@@ -6,23 +6,21 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("Weapon_ShowDefaultPart")]
-public class Weapon_ShowDefaultPart : ICallGSHandler
+public class Weapon_ShowDefaultPart : CallGSHandler<WeaponShowDefaultPartParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, WeaponShowDefaultPartParam req)
     {
-        var req = JsonSerializer.Deserialize<WeaponShowDefaultPartParam>(param);
+
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "Weapon_ShowDefaultPart", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         var weaponData = player.InventoryManager.GetWeaponItem(req.Id);
         if (weaponData == null)
         {
-            await CallGSRouter.SendScript(connection, "Weapon_ShowDefaultPart", "{}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}"));
         }
 
         if (req.Flag == 1) weaponData.Flag = ItemFlagEnum.FLAG_WEAPON_DEFAULT;
@@ -32,11 +30,11 @@ public class Weapon_ShowDefaultPart : ICallGSHandler
         {
             Items = { weaponData.ToProto() }
         };
-        await CallGSRouter.SendScript(connection, "Weapon_ShowDefaultPart", "null", sync);
+        return Task.FromResult(CallGSResult.Ok("null", sync));
     }
 }
 
-internal sealed class WeaponShowDefaultPartParam
+public sealed class WeaponShowDefaultPartParam
 {
     [JsonPropertyName("nFlag")] public int Flag { get; set; }
     public uint Id { get; set; }

@@ -8,31 +8,28 @@ namespace MikuSB.GameServer.Server.CallGS.Handlers.Weapon;
 
 // s2c: function(sErr) — send "null" on success (json.decode("null") = nil = falsy in Lua)
 [CallGSApi("Weapon_Break")]
-public class Weapon_Break : ICallGSHandler
+public class Weapon_Break : CallGSHandler<WeaponBreakParam>
 {
     private const uint MaxBreak = 6;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, WeaponBreakParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<WeaponBreakParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.WeaponId == 0)
         {
-            await CallGSRouter.SendScript(connection, "Weapon_Break", "\"error.BadParam\"");
-            return;
+            return Task.FromResult(CallGSResult.Ok("\"error.BadParam\""));
         }
 
         var weapon = player.InventoryManager.InventoryData.Weapons.GetValueOrDefault((uint)req.WeaponId);
         if (weapon == null)
         {
-            await CallGSRouter.SendScript(connection, "Weapon_Break", "\"error.BadParam\"");
-            return;
+            return Task.FromResult(CallGSResult.Ok("\"error.BadParam\""));
         }
 
         if (weapon.Break >= MaxBreak)
         {
-            await CallGSRouter.SendScript(connection, "Weapon_Break", "\"tip.already_max_break\"");
-            return;
+            return Task.FromResult(CallGSResult.Ok("\"tip.already_max_break\""));
         }
 
         var nextBreak = weapon.Break + 1;
@@ -59,8 +56,7 @@ public class Weapon_Break : ICallGSHandler
             var item = player.InventoryManager.InventoryData.Items.Values.FirstOrDefault(x => x.TemplateId == tid);
             if (item == null || item.ItemCount < count)
             {
-                await CallGSRouter.SendScript(connection, "Weapon_Break", "\"tip.not_material_for_break\"");
-                return;
+                return Task.FromResult(CallGSResult.Ok("\"tip.not_material_for_break\""));
             }
         }
 
@@ -87,11 +83,11 @@ public class Weapon_Break : ICallGSHandler
         var sync = new NtfSyncPlayer();
         sync.Items.AddRange(syncItems);
 
-        await CallGSRouter.SendScript(connection, "Weapon_Break", "null", sync);
+        return Task.FromResult(CallGSResult.Ok("null", sync));
     }
 }
 
-internal sealed class WeaponBreakParam
+public sealed class WeaponBreakParam
 {
     [JsonPropertyName("Id")]
     public int WeaponId { get; set; }

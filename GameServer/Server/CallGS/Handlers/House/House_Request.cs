@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.House;
 
 [CallGSApi("House_Request")]
-public class House_Request : ICallGSHandler
+public class House_Request : CallGSHandler<HouseRequestParam>
 {
     private static readonly Dictionary<string, IHouseFuncHandler> Handlers = [];
 
@@ -18,24 +18,22 @@ public class House_Request : ICallGSHandler
         }
     }
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override async Task<CallGSResult> HandleAsync(CallGSContext context, HouseRequestParam req)
     {
-        var req = JsonSerializer.Deserialize<HouseRequestParam>(param);
-        if (req?.FuncName == null) return;
 
+        if (req?.FuncName == null) return CallGSResult.NoResponse();
         if (Handlers.TryGetValue(req.FuncName, out var handler))
         {
-            await handler.Handle(connection, param);
-            return;
+            return await handler.Handle(context, context.RawParam);
         }
 
-        var root = HouseJson.ParseObject(param);
-        if (root == null) return;
-        await CallGSRouter.SendScript(connection, "House_Request", HouseRequestScript.Synthesize(root));
+        var root = HouseJson.ParseObject(context.RawParam);
+        if (root == null) return CallGSResult.NoResponse();
+        return CallGSResult.Ok(HouseRequestScript.Synthesize(root));
     }
 }
 
-internal sealed class HouseRequestParam
+public sealed class HouseRequestParam
 {
     [JsonPropertyName("FuncName")]
     public string? FuncName { get; set; }

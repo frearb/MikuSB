@@ -49,6 +49,9 @@
     "PatchPaths": [
       "Patch\\MikuSB-Patch.dll"
     ],
+    "EnableInGameConsole": true,
+    "AutoUpdateInGameConsole": true,
+    "InGameConsoleLoaderPath": "Patch\\MikuSB-InGame-GUI-Console.Loader.dll",
     "Arguments": [
       "-FeatureLevelES31",
       "-channelid=seasun",

@@ -5,12 +5,12 @@ using System.Text.Json;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Weapon;
 
 [CallGSApi("Weapon_Replace")]
-public class Weapon_Replace : ICallGSHandler
+public class Weapon_Replace : CallGSHandler<WeaponReplaceParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, WeaponReplaceParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<WeaponReplaceParam>(param);
+        var player = context.Connection.Player!;
+
         var cardData = req == null ? null : player.CharacterManager.GetCharacterByGUID((uint)req.CardId);
         var newWeapon = req == null ? null : player.InventoryManager.GetWeaponItem((uint)req.Id);
 
@@ -34,15 +34,14 @@ public class Weapon_Replace : ICallGSHandler
             {
                 Items = { cardData.ToProto() }
             };
-            await CallGSRouter.SendScript(connection, "Weapon_Replace", "{}", sync);
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}", sync));
         }
 
-        await CallGSRouter.SendScript(connection, "Weapon_Replace", "{}");
+        return Task.FromResult(CallGSResult.Ok("{}"));
     }
 }
 
-internal sealed class WeaponReplaceParam
+public sealed class WeaponReplaceParam
 {
     public int CardId { get; set; }
     public int Id { get; set; }

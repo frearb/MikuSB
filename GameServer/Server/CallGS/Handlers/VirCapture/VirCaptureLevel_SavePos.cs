@@ -6,18 +6,17 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.VirCapture;
 
 [CallGSApi("VirCaptureLevel_SavePos")]
-public class VirCaptureLevel_SavePos : ICallGSHandler
+public class VirCaptureLevel_SavePos : CallGSHandler<VirCaptureSavePosParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, VirCaptureSavePosParam req)
     {
-        var req = JsonSerializer.Deserialize<VirCaptureSavePosParam>(param);
+
         if (req == null || req.LevelId == 0)
         {
-            await CallGSRouter.SendScript(connection, "VirCaptureLevel_SavePos", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         var sync = new NtfSyncPlayer();
         VirCaptureStateHelper.SetSignedMapOffset(player, (uint)req.LevelId, VirCaptureStateHelper.OffPosX, req.PosX, sync);
         VirCaptureStateHelper.SetSignedMapOffset(player, (uint)req.LevelId, VirCaptureStateHelper.OffPosY, req.PosY, sync);
@@ -25,11 +24,11 @@ public class VirCaptureLevel_SavePos : ICallGSHandler
         VirCaptureStateHelper.SetSignedMapOffset(player, (uint)req.LevelId, VirCaptureStateHelper.OffToward, req.Toward, sync);
 
         DatabaseHelper.SaveDatabaseType(player.Data);
-        await CallGSRouter.SendScript(connection, "VirCaptureLevel_SavePos", "{}", sync);
+        return Task.FromResult(CallGSResult.Ok("{}", sync));
     }
 }
 
-internal sealed class VirCaptureSavePosParam
+public sealed class VirCaptureSavePosParam
 {
     [JsonPropertyName("nLevelID")]
     public int LevelId { get; set; }

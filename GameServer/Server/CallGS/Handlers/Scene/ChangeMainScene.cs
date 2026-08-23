@@ -1,50 +1,40 @@
 ﻿using MikuSB.Database.Player;
 using MikuSB.Proto;
+using MikuSB.GameServer.Game.Player;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
+using MikuSB.Data;
 
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Scene;
 
 // Response:{sErr:true or false}
 [CallGSApi("ChangeMainScene")]
-public class ChangeMainScene : ICallGSHandler
+public class ChangeMainScene : CallGSHandler<ChangeMainSceneParam>
 {
-    private const int MainSceneGID = 132;
-    private const int MainSceneSID = 1;
+    private const uint MainSceneGID = AttrIds.Scene.MainGid;
+    private const uint MainSceneSID = AttrIds.Scene.MainSid;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, ChangeMainSceneParam req)
     {
         string rsp = $"{{\"sErr\":false}}";
-        var req = JsonSerializer.Deserialize<ChangeMainSceneParam>(param);
+
         if (req == null) 
         {
-            await CallGSRouter.SendScript(connection, "ChangeMainScene", rsp);
-            return;
+            return Task.FromResult(CallGSResult.Ok(rsp));
         } 
 
-        var player = connection.Player!;
-        var mainSceneAttr = player.Data.Attrs
-            .FirstOrDefault(x => x.Gid == MainSceneGID && x.Sid == MainSceneSID);
-
-        if (mainSceneAttr == null)
-        {
-            mainSceneAttr = new PlayerAttr
-            {
-                Gid = MainSceneGID,
-                Sid = MainSceneSID
-            };
-            player.Data.Attrs.Add(mainSceneAttr);
-        }
+        var player = context.Connection.Player!;
+        var mainSceneAttr = player.Attributes.GetOrCreate(MainSceneGID, MainSceneSID);
         var sync = new NtfSyncPlayer();
         mainSceneAttr.Val = req.Id;
 
-        sync.Custom[player.ToPackedAttrKey(MainSceneGID, MainSceneSID)] = mainSceneAttr.Val;
-        sync.Custom[player.ToShiftedAttrKey(MainSceneGID, MainSceneSID)] = mainSceneAttr.Val;
-        await CallGSRouter.SendScript(connection, "ChangeMainScene", rsp, sync);
+        player.Attributes.SyncTo(sync, mainSceneAttr);
+        return Task.FromResult(CallGSResult.Ok(rsp, sync));
     }
 }
 
-internal sealed class ChangeMainSceneParam
+public sealed class ChangeMainSceneParam
 {
     [JsonPropertyName("nId")]
     public uint Id { get; set; }

@@ -7,17 +7,16 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("GirlSkinParts_Update")]
-public class GirlSkinParts_Update : ICallGSHandler
+public class GirlSkinParts_Update : CallGSHandler<GirlSkinPartsUpdateParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, GirlSkinPartsUpdateParam req)
     {
-        var req = JsonSerializer.Deserialize<GirlSkinPartsUpdateParam>(param);
+
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlSkinParts_Update", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         var data = new List<GameSkinInfo>();
         foreach(var partId in req.PartsId)
         {
@@ -38,11 +37,11 @@ public class GirlSkinParts_Update : ICallGSHandler
         {
             Items = { data.Select(x => x.ToProto()) }
         };
-        await CallGSRouter.SendScript(connection, "GirlSkinParts_Update", "{}", sync);
+        return Task.FromResult(CallGSResult.Ok("{}", sync));
     }
 }
 
-internal sealed class GirlSkinPartsUpdateParam
+public sealed class GirlSkinPartsUpdateParam
 {
     [JsonPropertyName("tbPartsID")]
     public List<uint> PartsId { get; set; } = [];

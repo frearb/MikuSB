@@ -3,11 +3,11 @@ using MikuSB.GameServer.Game.BossPvp;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.BossPvp;
 
 [CallGSApi("BossPvpLogic_EnterLevel")]
-public class BossPvpLogic_EnterLevel : ICallGSHandler
+public class BossPvpLogic_EnterLevel : CallGSHandler
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
-        var response = BossPvpService.HandleEnterLevel(connection.Player!, param);
-        await CallGSRouter.SendScript(connection, "BossPvpLogic_EnterLevel", System.Text.Json.JsonSerializer.Serialize(response));
+        var response = BossPvpService.HandleEnterLevel(context.Player, param);
+        return Task.FromResult(CallGSResult.Ok(System.Text.Json.JsonSerializer.Serialize(response)));
     }
 }

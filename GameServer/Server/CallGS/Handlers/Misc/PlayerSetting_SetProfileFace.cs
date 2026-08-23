@@ -7,22 +7,20 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Misc;
 
 [CallGSApi("PlayerSetting_SetProfileFace")]
-public class PlayerSetting_SetProfileFace : ICallGSHandler
+public class PlayerSetting_SetProfileFace : CallGSHandler<SetProfileFaceParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SetProfileFaceParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<SetProfileFaceParam>(param);
-        if (req == null)
-            return;
+        var player = context.Connection.Player!;
 
+        if (req == null)
+            return Task.FromResult(CallGSResult.NoResponse());
         if (req.HeadItemId > 0)
         {
             var item = player.InventoryManager.GetNormalItem(req.HeadItemId);
             if (item == null)
             {
-                await CallGSRouter.SendScript(connection, "PlayerSetting_SetProfileFace", "{\"err\":\"error.BadParam\"}");
-                return;
+                return Task.FromResult(CallGSResult.Ok("{\"err\":\"error.BadParam\"}"));
             }
             player.SetShowItem((int)ProfileShowItemTypeEnum.SHOWITEM_FACE, item.UniqueId);
         }
@@ -31,19 +29,18 @@ public class PlayerSetting_SetProfileFace : ICallGSHandler
             var item = player.InventoryManager.GetNormalItem(req.FrameItemId);
             if (item == null)
             {
-                await CallGSRouter.SendScript(connection, "PlayerSetting_SetProfileFace", "{\"err\":\"error.BadParam\"}");
-                return;
+                return Task.FromResult(CallGSResult.Ok("{\"err\":\"error.BadParam\"}"));
             }
             player.SetShowItem((int)ProfileShowItemTypeEnum.SHOWITEM_FRAME, item.UniqueId);
         }
         DatabaseHelper.SaveDatabaseType(player.Data);
         var sync = new NtfSyncPlayer();
         sync.ShowItems.AddRange(player.Data.ShowItems);
-        await CallGSRouter.SendScript(connection, "PlayerSetting_SetProfileFace", "null", sync);
+        return Task.FromResult(CallGSResult.Ok("null", sync));
     }
 }
 
-internal sealed class SetProfileFaceParam
+public sealed class SetProfileFaceParam
 {
     [JsonPropertyName("nHeadItemID")] public uint HeadItemId { get; set; }
     [JsonPropertyName("nFrameItemID")] public uint FrameItemId { get; set; }

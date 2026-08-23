@@ -5,23 +5,21 @@ using System.Text.Json.Nodes;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.SupporterCard;
 
 [CallGSApi("SupporterCard_ReceiveFixedItem")]
-public class SupporterCard_ReceiveFixedItem : ICallGSHandler
+public class SupporterCard_ReceiveFixedItem : CallGSHandler
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override async Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         if (!GameData.SupportFixedData.TryGetValue(1, out var fixedCfg) || fixedCfg.Item.Count < 5 || fixedCfg.Num <= 0)
         {
-            await CallGSRouter.SendScript(connection, "SupporterCard_ReceiveFixedItem", "{}");
-            return;
+            return CallGSResult.Ok("{}");
         }
 
-        var attr = SupporterCardAffixShared.GetOrCreateAttr(player.Data, SupporterCardAffixShared.BaseGid, SupporterCardAffixShared.FixedResetSid);
+        var attr = player.Attributes.GetOrCreate(SupporterCardAffixShared.BaseGid, SupporterCardAffixShared.FixedResetSid);
         var claimCount = attr.Val / (uint)fixedCfg.Num;
         if (claimCount == 0)
         {
-            await CallGSRouter.SendScript(connection, "SupporterCard_ReceiveFixedItem", "{}");
-            return;
+            return CallGSResult.Ok("{}");
         }
 
         attr.Val %= (uint)fixedCfg.Num;
@@ -30,8 +28,7 @@ public class SupporterCard_ReceiveFixedItem : ICallGSHandler
         var rewardItem = GameData.SuppliesData.GetValueOrDefault(rewardTemplateId);
         if (rewardItem == null)
         {
-            await CallGSRouter.SendScript(connection, "SupporterCard_ReceiveFixedItem", "{}");
-            return;
+            return CallGSResult.Ok("{}");
         }
 
         var granted = await player.InventoryManager.AddSuppliesItem(rewardItem, claimCount * fixedCfg.Item[4], sendPacket: false);
@@ -39,8 +36,8 @@ public class SupporterCard_ReceiveFixedItem : ICallGSHandler
         var sync = new NtfSyncPlayer();
         if (granted != null)
             sync.Items.Add(granted.ToProto());
-        SupporterCardAffixShared.SetAttr(connection, sync, SupporterCardAffixShared.BaseGid, SupporterCardAffixShared.FixedResetSid, attr.Val);
-        SupporterCardAffixShared.Save(connection);
+        SupporterCardAffixShared.SetAttr(context.Connection, sync, SupporterCardAffixShared.BaseGid, SupporterCardAffixShared.FixedResetSid, attr.Val);
+        SupporterCardAffixShared.Save(context.Connection);
 
         var arg = new JsonObject
         {
@@ -52,6 +49,6 @@ public class SupporterCard_ReceiveFixedItem : ICallGSHandler
                 (int)(claimCount * fixedCfg.Item[4]))
         }.ToJsonString();
 
-        await CallGSRouter.SendScript(connection, "SupporterCard_ReceiveFixedItem", arg, sync);
+        return CallGSResult.Ok(arg, sync);
     }
 }

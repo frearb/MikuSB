@@ -7,18 +7,17 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.VirCapture;
 
 [CallGSApi("VirCaptureLevel_SaveFightData")]
-public class VirCaptureLevel_SaveFightData : ICallGSHandler
+public class VirCaptureLevel_SaveFightData : CallGSHandler<VirCaptureSaveFightDataParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, VirCaptureSaveFightDataParam req)
     {
-        var req = JsonSerializer.Deserialize<VirCaptureSaveFightDataParam>(param);
+
         if (req == null || req.LevelId == 0 || req.RegionId == 0)
         {
-            await CallGSRouter.SendScript(connection, "VirCaptureLevel_SaveFightData", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         var sync = new NtfSyncPlayer();
         VirCaptureStateHelper.SetPointState(player, (uint)req.LevelId, (uint)req.RegionId, 2u, sync);
 
@@ -31,11 +30,11 @@ public class VirCaptureLevel_SaveFightData : ICallGSHandler
             ["tbRewards"] = new JsonArray()
         };
 
-        await CallGSRouter.SendScript(connection, "VirCaptureLevel_SaveFightData", response.ToJsonString(), sync);
+        return Task.FromResult(CallGSResult.Ok(response.ToJsonString(), sync));
     }
 }
 
-internal sealed class VirCaptureSaveFightDataParam
+public sealed class VirCaptureSaveFightDataParam
 {
     [JsonPropertyName("nLevelID")]
     public int LevelId { get; set; }

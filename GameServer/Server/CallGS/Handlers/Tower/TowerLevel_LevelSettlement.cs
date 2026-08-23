@@ -1,7 +1,6 @@
 using MikuSB.Data;
 using MikuSB.Data.Excel;
 using MikuSB.Database;
-using MikuSB.Database.Player;
 using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using MikuSB.Util;
@@ -12,20 +11,20 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Tower;
 
 [CallGSApi("TowerLevel_LevelSettlement")]
-public class TowerLevel_LevelSettlement : ICallGSHandler
+public class TowerLevel_LevelSettlement : CallGSHandler
 {
     private static readonly Logger Logger = new("Tower");
-    private const uint TowerGroupId = 3;
-    private const uint LaunchPassGroupId = 22;
-    private const uint BasicProgressSid = 2;
-    private const uint AdvancedProgressSid = 3;
-    private const uint LevelStateSidBase = 10000;
+    private const uint TowerGroupId = AttrIds.Tower.Gid;
+    private const uint LaunchPassGroupId = AttrIds.Tower.PassGid;
+    private const uint BasicProgressSid = AttrIds.Tower.BasicProgressSid;
+    private const uint AdvancedProgressSid = AttrIds.Tower.AdvancedProgressSid;
+    private const uint LevelStateSidBase = AttrIds.Tower.LevelStateSidBase;
     private const int FinalArea = 3;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
-        var (response, sync) = HandleSettlement(connection.Player!, JsonNode.Parse(param));
-        await CallGSRouter.SendScript(connection, "TowerLevel_LevelSettlement", response.ToJsonString(), sync);
+        var (response, sync) = HandleSettlement(context.Connection.Player!, JsonNode.Parse(param));
+        return Task.FromResult(CallGSResult.Ok(response.ToJsonString(), sync));
     }
 
     public static (JsonNode Response, NtfSyncPlayer Sync) HandleSettlement(PlayerInstance player, JsonNode? tbParam)
@@ -47,18 +46,18 @@ public class TowerLevel_LevelSettlement : ICallGSHandler
 
         var sync = new NtfSyncPlayer();
         var levelStateSid = LevelStateSidBase + (uint)req.TowerId;
-        var levelState = GetOrCreateAttr(player.Data, TowerGroupId, levelStateSid);
+        var levelState = player.Attributes.GetOrCreate(TowerGroupId, levelStateSid);
         levelState.Val = MergeAreaStars(levelState.Val, FinalArea, req.StarMask);
-        SyncAttr(sync, player, levelState);
+        player.Attributes.SyncTo(sync, levelState);
 
         var progressSid = towerType == 1 ? BasicProgressSid : AdvancedProgressSid;
-        var progressAttr = GetOrCreateAttr(player.Data, TowerGroupId, progressSid);
+        var progressAttr = player.Attributes.GetOrCreate(TowerGroupId, progressSid);
         progressAttr.Val = 0;
-        SyncAttr(sync, player, progressAttr);
+        player.Attributes.SyncTo(sync, progressAttr);
 
-        var passAttr = GetOrCreateAttr(player.Data, LaunchPassGroupId, (uint)req.LevelId);
+        var passAttr = player.Attributes.GetOrCreate(LaunchPassGroupId, (uint)req.LevelId);
         passAttr.Val = Math.Max(1u, passAttr.Val + 1);
-        SyncAttr(sync, player, passAttr);
+        player.Attributes.SyncTo(sync, passAttr);
 
         Logger.Info(
             $"Tower settlement saved. uid={player.Uid} towerId={req.TowerId} levelId={req.LevelId} starMask={req.StarMask} " +
@@ -143,26 +142,6 @@ public class TowerLevel_LevelSettlement : ICallGSHandler
             : null;
     }
 
-    private static PlayerAttr GetOrCreateAttr(PlayerGameData data, uint gid, uint sid)
-    {
-        var attr = data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
-        if (attr != null)
-            return attr;
-
-        attr = new PlayerAttr
-        {
-            Gid = gid,
-            Sid = sid
-        };
-        data.Attrs.Add(attr);
-        return attr;
-    }
-
-    private static void SyncAttr(MikuSB.Proto.NtfSyncPlayer sync, PlayerInstance player, PlayerAttr attr)
-    {
-        sync.Custom[player.ToPackedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-        sync.Custom[player.ToShiftedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-    }
 }
 
 internal sealed class TowerLevelSettlementParam

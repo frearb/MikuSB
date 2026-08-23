@@ -9,11 +9,10 @@ public class UnLockWaterGunGameItem : IHouseFuncHandler
     private const uint HouseHotSpringInfoStart = 15000;
     private const uint WaterGunItemCollectBegin = 17;
 
-    public async Task Handle(Connection connection, string param)
+    public async Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var root = HouseJson.ParseObject(param);
-        if (root == null) return;
-
+        if (root == null) return CallGSResult.NoResponse();
         var sync = new NtfSyncPlayer();
         if (root["tbItem"] is JsonArray items)
         {
@@ -27,15 +26,15 @@ public class UnLockWaterGunGameItem : IHouseFuncHandler
                 var sid = HouseHotSpringInfoStart + WaterGunItemCollectBegin + (uint)offset;
                 var cur = touched.TryGetValue(sid, out var existing)
                     ? existing
-                    : HouseAttr.Read(connection.Player!, sid);
+                    : HouseAttr.Read(context.Connection.Player!, sid);
                 touched[sid] = cur | (1u << bit);
             }
 
             foreach (var (sid, value) in touched)
-                await HouseAttr.SetAsync(connection, sid, value, sync);
+                await HouseAttr.SetAsync(context.Connection, sid, value, sync);
         }
 
-        await CallGSRouter.SendScript(connection, "House_Request", HouseRequestScript.Synthesize(root), sync);
+        return CallGSResult.Ok(HouseRequestScript.Synthesize(root), sync);
     }
 }
 
@@ -53,11 +52,10 @@ public class RouletteEnd : IHouseFuncHandler
     private const int RouletteEndReasonSuccess = 0;
     private const int RouletteTutorialGirlId = 5;
 
-    public async Task Handle(Connection connection, string param)
+    public async Task<CallGSResult> Handle(CallGSContext context, string param)
     {
         var root = HouseJson.ParseObject(param);
-        if (root == null) return;
-
+        if (root == null) return CallGSResult.NoResponse();
         var modeType = HouseJson.NumField(root, "ModeType");
         var girlId = HouseJson.NumField(root, "GirlId");
         var isSuccess = HouseJson.NumField(root, "IsSuccess");
@@ -69,22 +67,22 @@ public class RouletteEnd : IHouseFuncHandler
             if (modeType == RoulettePlayModePlot && girlId > 0)
             {
                 await HouseAttr.SetAsync(
-                    connection,
+                    context.Connection,
                     HotSpringGirlInfoStart + (uint)(girlId * (int)HotSpringGirlAttrCount) + HotSpringGirlHasCompleteStory,
                     1,
                     sync);
                 if (girlId == RouletteTutorialGirlId)
-                    await HouseAttr.SetAsync(connection, HouseHotSpringInfoStart + HasCompleteGameGuide, 1, sync);
+                    await HouseAttr.SetAsync(context.Connection, HouseHotSpringInfoStart + HasCompleteGameGuide, 1, sync);
             }
             else if (modeType == RoulettePlayModeEndless && rounds > 0)
             {
                 var sid = HouseHotSpringInfoStart + MaxRoundsInWaterGun;
-                var prev = HouseAttr.Read(connection.Player!, sid);
+                var prev = HouseAttr.Read(context.Connection.Player!, sid);
                 if ((uint)rounds > prev)
-                    await HouseAttr.SetAsync(connection, sid, (uint)rounds, sync);
+                    await HouseAttr.SetAsync(context.Connection, sid, (uint)rounds, sync);
             }
         }
 
-        await CallGSRouter.SendScript(connection, "House_Request", HouseRequestScript.Synthesize(root), sync);
+        return CallGSResult.Ok(HouseRequestScript.Synthesize(root), sync);
     }
 }

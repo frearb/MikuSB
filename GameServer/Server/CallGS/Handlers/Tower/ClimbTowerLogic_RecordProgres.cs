@@ -10,48 +10,45 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Tower;
 
 [CallGSApi("ClimbTowerLogic_RecordProgres")]
-public class ClimbTowerLogic_RecordProgres : ICallGSHandler
+public class ClimbTowerLogic_RecordProgres : CallGSHandler<ClimbTowerRecordProgressParam>
 {
-    private const uint TowerGroupId = 3;
-    private const uint BasicProgressSid = 2;
-    private const uint AdvancedProgressSid = 3;
-    private const uint LevelStateSidBase = 10000;
+    private const uint TowerGroupId = AttrIds.Tower.Gid;
+    private const uint BasicProgressSid = AttrIds.Tower.BasicProgressSid;
+    private const uint AdvancedProgressSid = AttrIds.Tower.AdvancedProgressSid;
+    private const uint LevelStateSidBase = AttrIds.Tower.LevelStateSidBase;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, ClimbTowerRecordProgressParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<ClimbTowerRecordProgressParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.LevelId == 0 || req.Area <= 0)
         {
-            await CallGSRouter.SendScript(connection, "ClimbTowerLogic_RecordProgres", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var cycle = ResolveCurrentCycle(GameData.ClimbTowerTimeData.Values, DateTime.Now);
         if (cycle == null)
         {
-            await CallGSRouter.SendScript(connection, "ClimbTowerLogic_RecordProgres", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var towerType = ResolveTowerType(cycle, (uint)req.LevelId);
         if (towerType == 0)
         {
-            await CallGSRouter.SendScript(connection, "ClimbTowerLogic_RecordProgres", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var sync = new NtfSyncPlayer();
 
         var levelStateSid = LevelStateSidBase + (uint)req.LevelId;
-        var levelState = GetOrCreateAttr(player.Data, TowerGroupId, levelStateSid);
+        var levelState = player.Attributes.GetOrCreate(TowerGroupId, levelStateSid);
         levelState.Val = MergeAreaStars(levelState.Val, req.Area, req.StarMask);
-        SyncAttr(sync, player, levelState);
+        player.Attributes.SyncTo(sync, levelState);
 
         var progressSid = towerType == 1 ? BasicProgressSid : AdvancedProgressSid;
-        var progressAttr = GetOrCreateAttr(player.Data, TowerGroupId, progressSid);
+        var progressAttr = player.Attributes.GetOrCreate(TowerGroupId, progressSid);
         progressAttr.Val = req.Area >= 3 ? 0u : PackProgress((uint)req.LevelId, (uint)(req.Area + 1));
-        SyncAttr(sync, player, progressAttr);
+        player.Attributes.SyncTo(sync, progressAttr);
 
         if (req.RoleHP.Count > 0 || req.TeamEnergy.HasValue)
         {
@@ -59,7 +56,7 @@ public class ClimbTowerLogic_RecordProgres : ICallGSHandler
         }
 
         DatabaseHelper.SaveDatabaseType(player.Data);
-        await CallGSRouter.SendScript(connection, "ClimbTowerLogic_RecordProgres", "{}", sync);
+        return Task.FromResult(CallGSResult.Ok("{}", sync));
     }
 
     private static void SaveRoleState(
@@ -73,12 +70,12 @@ public class ClimbTowerLogic_RecordProgres : ICallGSHandler
 
         for (var slot = slotStart; slot < slotStart + 3; slot++)
         {
-            var templateAttr = GetOrCreateAttr(player.Data, TowerGroupId, slot * 10);
-            var hpAttr = GetOrCreateAttr(player.Data, TowerGroupId, slot * 10 + 1);
+            var templateAttr = player.Attributes.GetOrCreate(TowerGroupId, slot * 10);
+            var hpAttr = player.Attributes.GetOrCreate(TowerGroupId, slot * 10 + 1);
             templateAttr.Val = 0;
             hpAttr.Val = 0;
-            SyncAttr(sync, player, templateAttr);
-            SyncAttr(sync, player, hpAttr);
+            player.Attributes.SyncTo(sync, templateAttr);
+            player.Attributes.SyncTo(sync, hpAttr);
         }
 
         for (var i = 0; i < Math.Min(roleHp.Count, 3); i++)
@@ -88,17 +85,17 @@ public class ClimbTowerLogic_RecordProgres : ICallGSHandler
                 continue;
 
             var slot = slotStart + (uint)i;
-            var templateAttr = GetOrCreateAttr(player.Data, TowerGroupId, slot * 10);
-            var hpAttr = GetOrCreateAttr(player.Data, TowerGroupId, slot * 10 + 1);
+            var templateAttr = player.Attributes.GetOrCreate(TowerGroupId, slot * 10);
+            var hpAttr = player.Attributes.GetOrCreate(TowerGroupId, slot * 10 + 1);
             templateAttr.Val = (uint)Math.Max(0, row[0]);
             hpAttr.Val = (uint)Math.Max(0, row[1]);
-            SyncAttr(sync, player, templateAttr);
-            SyncAttr(sync, player, hpAttr);
+            player.Attributes.SyncTo(sync, templateAttr);
+            player.Attributes.SyncTo(sync, hpAttr);
         }
 
-        var energyAttr = GetOrCreateAttr(player.Data, TowerGroupId, slotStart * 10 + 2);
+        var energyAttr = player.Attributes.GetOrCreate(TowerGroupId, slotStart * 10 + 2);
         energyAttr.Val = (uint)Math.Max(0, teamEnergy);
-        SyncAttr(sync, player, energyAttr);
+        player.Attributes.SyncTo(sync, energyAttr);
     }
 
     private static uint MergeAreaStars(uint currentValue, int area, int starMask)
@@ -178,29 +175,9 @@ public class ClimbTowerLogic_RecordProgres : ICallGSHandler
             : null;
     }
 
-    private static PlayerAttr GetOrCreateAttr(PlayerGameData data, uint gid, uint sid)
-    {
-        var attr = data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
-        if (attr != null)
-            return attr;
-
-        attr = new PlayerAttr
-        {
-            Gid = gid,
-            Sid = sid
-        };
-        data.Attrs.Add(attr);
-        return attr;
-    }
-
-    private static void SyncAttr(NtfSyncPlayer sync, PlayerInstance player, PlayerAttr attr)
-    {
-        sync.Custom[player.ToPackedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-        sync.Custom[player.ToShiftedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-    }
 }
 
-internal sealed class ClimbTowerRecordProgressParam
+public sealed class ClimbTowerRecordProgressParam
 {
     [JsonPropertyName("nID")]
     public int LevelId { get; set; }

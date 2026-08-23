@@ -5,15 +5,14 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Lineup;
 
 [CallGSApi("Lineups_Update")]
-public class Lineups_Update : ICallGSHandler
+public class Lineups_Update : CallGSHandler<List<LineupUpdateBatchParam>>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override async Task<CallGSResult> HandleAsync(CallGSContext context, List<LineupUpdateBatchParam> req)
     {
-        var req = JsonSerializer.Deserialize<List<LineupUpdateBatchParam>>(param);
+
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "UpdateLineup", "{}");
-            return;
+            return CallGSResult.Ok("{}", "UpdateLineup");
         }
 
         foreach (var lineup in req)
@@ -21,19 +20,19 @@ public class Lineups_Update : ICallGSHandler
             if (lineup == null)
                 continue;
 
-            await connection.Player!.LineupManager.UpdateLineup(
+            await context.Connection.Player!.LineupManager.UpdateLineup(
                 lineup.Index,
                 lineup.Member1,
                 lineup.Member2,
                 lineup.Member3);
         }
 
-        DatabaseHelper.SaveDatabaseType(connection.Player!.LineupManager.LineupData);
-        await CallGSRouter.SendScript(connection, "UpdateLineup", "{}");
+        DatabaseHelper.SaveDatabaseType(context.Connection.Player!.LineupManager.LineupData);
+        return CallGSResult.Ok("{}", "UpdateLineup");
     }
 }
 
-internal sealed class LineupUpdateBatchParam
+public sealed class LineupUpdateBatchParam
 {
     [JsonPropertyName("name")] public string Name { get; set; } = "";
     [JsonPropertyName("index")] public int Index { get; set; }

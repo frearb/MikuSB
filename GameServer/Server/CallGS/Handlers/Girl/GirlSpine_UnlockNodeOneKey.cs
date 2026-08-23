@@ -7,23 +7,21 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("GirlSpine_UnlockNodeOneKey")]
-public class GirlSpine_UnlockNodeOneKey : ICallGSHandler
+public class GirlSpine_UnlockNodeOneKey : CallGSHandler<OneKeyUnlockParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, OneKeyUnlockParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<OneKeyUnlockParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.CardId == 0 || req.MastIdx <= 0 || req.SubIdxList == null || req.SubIdxList.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "GirlSpine_ChildUnLock", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam", "GirlSpine_ChildUnLock"));
         }
 
         var card = player.CharacterManager.GetCharacterByGUID((uint)req.CardId);
         if (card == null)
         {
-            await CallGSRouter.SendScript(connection, "GirlSpine_ChildUnLock", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam", "GirlSpine_ChildUnLock"));
         }
 
         // Look up costs from config: CardExcel → SpineId → SpineExcel → NodeConditionId → NodeConditionExcel
@@ -68,8 +66,7 @@ public class GirlSpine_UnlockNodeOneKey : ICallGSHandler
             var item = player.InventoryManager.InventoryData.Items.Values.FirstOrDefault(x => x.TemplateId == tid);
             if (item == null || item.ItemCount < count)
             {
-                await CallGSRouter.SendScript(connection, "GirlSpine_ChildUnLock", "{\"sErr\":\"tip.not_material\"}");
-                return;
+                return Task.FromResult(CallGSResult.Error("tip.not_material", "GirlSpine_ChildUnLock"));
             }
         }
 
@@ -108,11 +105,11 @@ public class GirlSpine_UnlockNodeOneKey : ICallGSHandler
         // which calls UI.CloseConnection() and triggers OnNerveNodeUp to refresh the UI.
         var lastSubIdx = req.SubIdxList.Count > 0 ? req.SubIdxList[^1] : 9;
         var rsp = $"{{\"tb\":{{\"D\":{cardDetail},\"pId\":{req.CardId},\"MastIdx\":{req.MastIdx},\"SubIdx\":{lastSubIdx}}}}}";
-        await CallGSRouter.SendScript(connection, "GirlSpine_ChildUnLock", rsp, sync);
+        return Task.FromResult(CallGSResult.Ok(rsp, sync, "GirlSpine_ChildUnLock"));
     }
 }
 
-internal sealed class OneKeyUnlockParam
+public sealed class OneKeyUnlockParam
 {
     [JsonPropertyName("pId")]
     public int CardId { get; set; }

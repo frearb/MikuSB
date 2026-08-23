@@ -4,6 +4,7 @@ using MikuSB.Database.Character;
 using MikuSB.Enums.Item;
 using MikuSB.GameServer.Game.Player;
 using MikuSB.GameServer.Server.Packet.Send.Misc;
+using MikuSB.Proto;
 using MikuSB.Util.Extensions;
 
 namespace MikuSB.GameServer.Game.Character;
@@ -54,6 +55,45 @@ public class CharacterManager(PlayerInstance player) : BasePlayerManager(player)
     {
         var templateId = GameResourceTemplateId.FromGdpl((uint)genre,(uint)detail,(uint)particular,1);
         return CharacterData.Characters.Find(Character => Character.TemplateId == templateId);
+    }
+
+    public void AddExperienceToLineup(uint amount, NtfSyncPlayer sync, uint lineupId = 0)
+    {
+        if (amount == 0)
+            return;
+
+        if (lineupId == 0 || !Player.LineupManager.LineupData.LineupInfo.TryGetValue((int)lineupId, out var formation))
+            return;
+
+        var memberIds = new[] { formation.Member1, formation.Member2, formation.Member3 }
+            .Where(x => x > 0)
+            .Distinct();
+
+        foreach (var memberId in memberIds)
+        {
+            var character = GetCharacterByGUID(memberId);
+            if (character == null)
+                continue;
+
+            var cardData = GameData.CardData.Values.FirstOrDefault(x =>
+                GameResourceTemplateId.FromGdpl(x.Genre, x.Detail, x.Particular, x.Level) == character.TemplateId);
+            if (cardData == null)
+                continue;
+
+            var totalExp = (ulong)Math.Max(0, character.Exp) + amount;
+            while (character.Level < 80 && GameData.UpgradeExpData.TryGetValue((int)character.Level, out var levelExp))
+            {
+                var requiredExp = cardData.Color >= 5 ? levelExp.SSRCardNeedExp : levelExp.CardNeedExp;
+                if (requiredExp == 0 || totalExp < requiredExp)
+                    break;
+
+                totalExp -= requiredExp;
+                character.Level++;
+            }
+
+            character.Exp = (int)Math.Min(int.MaxValue, totalExp);
+            sync.Items.Add(character.ToProto());
+        }
     }
 
     public async ValueTask RepairCharacterWeapons()

@@ -5,17 +5,16 @@ using System.Text.Json;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.SupporterCard;
 
 [CallGSApi("SupporterCard_SelectInitialAffix")]
-public class SupporterCard_SelectInitialAffix : ICallGSHandler
+public class SupporterCard_SelectInitialAffix : CallGSHandler<SupporterCardSelectInitialParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SupporterCardSelectInitialParam req)
     {
-        var req = JsonSerializer.Deserialize<SupporterCardSelectInitialParam>(param);
-        var card = req == null ? null : connection.Player!.InventoryManager.GetSupportCardItem((uint)req.SupportCardUid);
+
+        var card = req == null ? null : context.Connection.Player!.InventoryManager.GetSupportCardItem((uint)req.SupportCardUid);
         if (req == null || card == null || req.Index is < 1 or > 2 || card.AffixId != req.Index || !SupportAffixStateService.HasAffix(card, SupportAffixStateService.PendingInitialAffixSlot))
         {
-            await SupporterCardAffixShared.SendSelectResponse(connection);
-            return;
-        }
+            return Task.FromResult(SupporterCardAffixShared.SelectResponse());
+}
 
         if (req.SelectNew)
             SupportAffixStateService.CopyAffix(card, SupportAffixStateService.PendingInitialAffixSlot, req.Index);
@@ -25,7 +24,7 @@ public class SupporterCard_SelectInitialAffix : ICallGSHandler
 
         var sync = new NtfSyncPlayer();
         sync.Items.Add(card.ToProto());
-        SupporterCardAffixShared.Save(connection);
-        await SupporterCardAffixShared.SendSelectResponse(connection, sync);
+        SupporterCardAffixShared.Save(context.Connection);
+        return Task.FromResult(SupporterCardAffixShared.SelectResponse(sync));
     }
 }

@@ -1,5 +1,4 @@
 using MikuSB.Database;
-using MikuSB.Database.Player;
 using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using MikuSB.Util;
@@ -7,20 +6,22 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
+using MikuSB.Data;
+
 namespace MikuSB.GameServer.Server.CallGS.Handlers.VirCapture;
 
 [CallGSApi("VirCaptureTower_LevelSettlement")]
-public class VirCaptureTower_LevelSettlement : ICallGSHandler
+public class VirCaptureTower_LevelSettlement : CallGSHandler
 {
-    private const uint LaunchLevelStateGroupId = 21;
-    private const uint LaunchPassGroupId = 22;
+    private const uint LaunchLevelStateGroupId = AttrIds.Tower.LevelStateGid;
+    private const uint LaunchPassGroupId = AttrIds.Tower.PassGid;
     private const uint PassedFlagBit = 1u << 8;
     private static readonly Logger Logger = new("VirCaptureTower");
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, string param)
     {
-        var (response, sync) = HandleSettlement(connection.Player!, JsonNode.Parse(param));
-        await CallGSRouter.SendScript(connection, "VirCaptureTower_LevelSettlement", response.ToJsonString(), sync);
+        var (response, sync) = HandleSettlement(context.Connection.Player!, JsonNode.Parse(param));
+        return Task.FromResult(CallGSResult.Ok(response.ToJsonString(), sync));
     }
 
     public static (JsonNode Response, NtfSyncPlayer Sync) HandleSettlement(PlayerInstance player, JsonNode? tbParam)
@@ -34,13 +35,13 @@ public class VirCaptureTower_LevelSettlement : ICallGSHandler
 
         var sync = new NtfSyncPlayer();
 
-        var levelStateAttr = GetOrCreateAttr(player.Data, LaunchLevelStateGroupId, (uint)req.LevelId);
+        var levelStateAttr = player.Attributes.GetOrCreate(LaunchLevelStateGroupId, (uint)req.LevelId);
         levelStateAttr.Val |= MergeStarMask(req.StarMask) | PassedFlagBit;
-        SyncAttr(sync, player, levelStateAttr);
+        player.Attributes.SyncTo(sync, levelStateAttr);
 
-        var passAttr = GetOrCreateAttr(player.Data, LaunchPassGroupId, (uint)req.LevelId);
+        var passAttr = player.Attributes.GetOrCreate(LaunchPassGroupId, (uint)req.LevelId);
         passAttr.Val = Math.Max(1u, passAttr.Val + 1);
-        SyncAttr(sync, player, passAttr);
+        player.Attributes.SyncTo(sync, passAttr);
 
         Logger.Info(
             $"VirCaptureTower settlement saved. uid={player.Uid} levelId={req.LevelId} starMask={req.StarMask} " +
@@ -62,26 +63,6 @@ public class VirCaptureTower_LevelSettlement : ICallGSHandler
         return result;
     }
 
-    private static PlayerAttr GetOrCreateAttr(PlayerGameData data, uint gid, uint sid)
-    {
-        var attr = data.Attrs.FirstOrDefault(x => x.Gid == gid && x.Sid == sid);
-        if (attr != null)
-            return attr;
-
-        attr = new PlayerAttr
-        {
-            Gid = gid,
-            Sid = sid
-        };
-        data.Attrs.Add(attr);
-        return attr;
-    }
-
-    private static void SyncAttr(NtfSyncPlayer sync, PlayerInstance player, PlayerAttr attr)
-    {
-        sync.Custom[player.ToPackedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-        sync.Custom[player.ToShiftedAttrKey(attr.Gid, attr.Sid)] = attr.Val;
-    }
 }
 
 internal sealed class VirCaptureTowerSettlementParam

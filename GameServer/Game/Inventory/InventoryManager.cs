@@ -260,6 +260,38 @@ public class InventoryManager(PlayerInstance player) : BasePlayerManager(player)
         return itemInfo;
     }
 
+    public async ValueTask<BaseGameItemInfo?> AddOtherItem(ItemTypeEnum genre, uint detail, uint particular, uint level, uint count, bool sendPacket = true)
+    {
+        if (genre != ItemTypeEnum.TYPE_USEABLE || count == 0)
+            return null;
+
+        var templateId = GameResourceTemplateId.FromGdpl((uint)genre, detail, particular, level);
+        if (!GameData.OtherItemData.TryGetValue(templateId, out var otherItem))
+            return null;
+
+        var maxCount = otherItem.GMnum > 0 ? otherItem.GMnum : 99999u;
+        var existing = InventoryData.Items.Values.FirstOrDefault(x => x.TemplateId == templateId);
+        if (existing != null)
+        {
+            existing.ItemCount = Math.Min(existing.ItemCount + count, maxCount);
+            return existing;
+        }
+
+        var item = new BaseGameItemInfo
+        {
+            TemplateId = templateId,
+            UniqueId = InventoryData.NextUniqueUid++,
+            ItemType = genre,
+            ItemCount = Math.Min(count, maxCount)
+        };
+        InventoryData.Items[item.UniqueId] = item;
+
+        if (sendPacket)
+            await Player.SendPacket(new PacketNtfCallScript([item]));
+
+        return item;
+    }
+
     public async ValueTask<BaseGameItemInfo?> AddWeaponSkinItem(ItemTypeEnum genre, uint detail, uint particular, uint level = 1, bool sendPacket = true)
     {
         if (genre != ItemTypeEnum.TYPE_WEAPON_SKIN) return null;

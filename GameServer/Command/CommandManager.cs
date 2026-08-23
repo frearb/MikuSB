@@ -40,7 +40,7 @@ public class CommandManager
             CommandAlias.Add(alias, attr.Name);
     }
 
-    public static async void HandleCommand(string input, ICommandSender sender)
+    public static async Task HandleCommand(string input, ICommandSender sender)
     {
         try
         {
@@ -104,7 +104,7 @@ public class CommandManager
                 {
                     argInfo.Args.RemoveAt(0);
                     isFound = true;
-                    methodInfo.Invoke(command, [argInfo]);
+                    await AwaitCommandResultAsync(methodInfo.Invoke(command, [argInfo]));
                     break;
                 }
             }
@@ -116,7 +116,7 @@ public class CommandManager
                 var attr = methodInfo.GetCustomAttribute<CommandDefaultAttribute>();
                 if (attr == null) continue;
                 isFound = true;
-                methodInfo.Invoke(command, [argInfo]);
+                await AwaitCommandResultAsync(methodInfo.Invoke(command, [argInfo]));
                 break;
             }
             if (isFound) return;
@@ -127,6 +127,19 @@ public class CommandManager
         catch (Exception ex)
         {
             Logger.Error(I18NManager.Translate("Game.Command.Notice.InternalError", ex.ToString()));
+        }
+    }
+
+    private static async Task AwaitCommandResultAsync(object? result)
+    {
+        switch (result)
+        {
+            case ValueTask valueTask:
+                await valueTask;
+                break;
+            case Task task:
+                await task;
+                break;
         }
     }
 }

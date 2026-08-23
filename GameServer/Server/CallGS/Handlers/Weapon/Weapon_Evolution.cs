@@ -9,23 +9,21 @@ namespace MikuSB.GameServer.Server.CallGS.Handlers.Weapon;
 // Id      = target weapon UniqueId
 // nItemId = material item UniqueId (weapon or supply item to consume)
 [CallGSApi("Weapon_Evolution")]
-public class Weapon_Evolution : ICallGSHandler
+public class Weapon_Evolution : CallGSHandler<WeaponEvolutionParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, WeaponEvolutionParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<WeaponEvolutionParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.WeaponId == 0 || req.MaterialId == 0)
         {
-            await CallGSRouter.SendScript(connection, "Weapon_Evolution", "\"error.BadParam\"");
-            return;
+            return Task.FromResult(CallGSResult.Ok("\"error.BadParam\""));
         }
 
         var weapon = player.InventoryManager.InventoryData.Weapons.GetValueOrDefault((uint)req.WeaponId);
         if (weapon == null)
         {
-            await CallGSRouter.SendScript(connection, "Weapon_Evolution", "\"error.BadParam\"");
-            return;
+            return Task.FromResult(CallGSResult.Ok("\"error.BadParam\""));
         }
 
         var syncItems = new List<Item>();
@@ -51,8 +49,7 @@ public class Weapon_Evolution : ICallGSHandler
         }
         else
         {
-            await CallGSRouter.SendScript(connection, "Weapon_Evolution", "\"tip.not_material\"");
-            return;
+            return Task.FromResult(CallGSResult.Ok("\"tip.not_material\""));
         }
 
         weapon.Evolue++;
@@ -63,11 +60,11 @@ public class Weapon_Evolution : ICallGSHandler
         var sync = new NtfSyncPlayer();
         sync.Items.AddRange(syncItems);
 
-        await CallGSRouter.SendScript(connection, "Weapon_Evolution", "null", sync);
+        return Task.FromResult(CallGSResult.Ok("null", sync));
     }
 }
 
-internal sealed class WeaponEvolutionParam
+public sealed class WeaponEvolutionParam
 {
     [JsonPropertyName("Id")]
     public int WeaponId { get; set; }

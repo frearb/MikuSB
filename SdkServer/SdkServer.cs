@@ -63,6 +63,17 @@ public class Startup
     {
         if (env.IsDevelopment()) app.UseDeveloperExceptionPage();
 
+        app.UseWebSockets();
+        app.Use(async (context, next) =>
+        {
+            if (string.Equals(context.Request.Path.Value, "/ws/gui-console", StringComparison.OrdinalIgnoreCase))
+            {
+                await InGameConsoleWebSocket.HandleAsync(context);
+                return;
+            }
+
+            await next();
+        });
         app.UseRouting();
         app.UseCors("AllowAll");
         app.UseAuthorization();

@@ -17,8 +17,8 @@ public class PacketRspLogin : BasePacket
         var skinCount = player.InventoryManager.InventoryData.Skins.Count;
         var weaponCount = player.InventoryManager.InventoryData.Weapons.Count;
         var supportCardCount = player.InventoryManager.InventoryData.SupportCards.Count;
-        var attrCount = player.Data.Attrs.Count;
-        var strAttrCount = player.Data.StrAttrs.Count;
+        var attrCount = player.Attributes.All.Count;
+        var strAttrCount = player.Attributes.AllStrings.Count;
         var showItemCount = player.Data.ShowItems.Count;
 
         var proto = new RspLogin

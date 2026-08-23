@@ -1,6 +1,3 @@
-using MikuSB.Database.Player;
-using MikuSB.Proto;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Rogue3D;
@@ -9,38 +6,22 @@ namespace MikuSB.GameServer.Server.CallGS.Handlers.Rogue3D;
 // param: {"nTalentId": int}
 // Response: {} on success, {"sErr": "key"} on failure
 [CallGSApi("Rogue3D_SelectSeasonTalent")]
-public class Rogue3D_SelectSeasonTalent : ICallGSHandler
+public class Rogue3D_SelectSeasonTalent : CallGSHandler<SelectSeasonTalentParam>
 {
-    private const uint GroupId = 124;
-    private const uint SeasonTalentIdSid = 1007;
-
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, SelectSeasonTalentParam req)
     {
-        var req = JsonSerializer.Deserialize<SelectSeasonTalentParam>(param);
+
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "Rogue3D_SelectSeasonTalent", "{}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}"));
         }
 
-        var player = connection.Player!;
-        var attr = player.Data.Attrs.FirstOrDefault(x => x.Gid == GroupId && x.Sid == SeasonTalentIdSid);
-        if (attr == null)
-        {
-            attr = new PlayerAttr { Gid = GroupId, Sid = SeasonTalentIdSid };
-            player.Data.Attrs.Add(attr);
-        }
-        attr.Val = req.TalentId;
-
-        var sync = new NtfSyncPlayer();
-        sync.Custom[player.ToPackedAttrKey(GroupId, SeasonTalentIdSid)] = attr.Val;
-        sync.Custom[player.ToShiftedAttrKey(GroupId, SeasonTalentIdSid)] = attr.Val;
-
-        await CallGSRouter.SendScript(connection, "Rogue3D_SelectSeasonTalent", "{}", sync);
+        var sync = context.Player.Rogue3DManager.SelectSeasonTalent(req.TalentId);
+        return Task.FromResult(CallGSResult.Ok("{}", sync));
     }
 }
 
-internal sealed class SelectSeasonTalentParam
+public sealed class SelectSeasonTalentParam
 {
     [JsonPropertyName("nTalentId")]
     public uint TalentId { get; set; }

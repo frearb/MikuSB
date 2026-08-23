@@ -4,23 +4,21 @@ using System.Text.Json;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 
 [CallGSApi("Weapon_ReplacePart")]
-public class Weapon_ReplacePart : ICallGSHandler
+public class Weapon_ReplacePart : CallGSHandler<WeaponPartReplaceParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, WeaponPartReplaceParam req)
     {
-        var req = JsonSerializer.Deserialize<WeaponPartReplaceParam>(param);
+
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "Weapon_ReplacePart", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
-        var player = connection.Player!;
+        var player = context.Connection.Player!;
         var weaponData = player.InventoryManager.GetWeaponItem(req.Id);
         if (weaponData == null)
         {
-            await CallGSRouter.SendScript(connection, "Weapon_ReplacePart", "{}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}"));
         }
 
         uint partId = 0;
@@ -35,11 +33,11 @@ public class Weapon_ReplacePart : ICallGSHandler
         {
             Items = { weaponData.ToProto() }
         };
-        await CallGSRouter.SendScript(connection, "Weapon_ReplacePart", "null", sync);
+        return Task.FromResult(CallGSResult.Ok("null", sync));
     }
 }
 
-internal sealed class WeaponPartReplaceParam
+public sealed class WeaponPartReplaceParam
 {
     public int PartId { get; set; }
     public uint Type { get; set; }

@@ -7,30 +7,28 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Misc;
 
 [CallGSApi("PlayerSetting_ChangeShowCard")]
-public class PlayerSetting_ChangeShowCard : ICallGSHandler
+public class PlayerSetting_ChangeShowCard : CallGSHandler<ChangeShowCardParam>
 {
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, ChangeShowCardParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<ChangeShowCardParam>(param);
-        if (req == null)
-            return;
+        var player = context.Connection.Player!;
 
+        if (req == null)
+            return Task.FromResult(CallGSResult.NoResponse());
         var card = player.CharacterManager.GetCharacterByGUID(req.Id);
         if (card == null)
         {
-            await CallGSRouter.SendScript(connection, "PlayerSetting_ChangeShowCard", "{}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}"));
         }
         player.SetShowItem((int)ProfileShowItemTypeEnum.SHOWITEM_GIRL, card.Guid);
         DatabaseHelper.SaveDatabaseType(player.Data);
         var sync = new NtfSyncPlayer();
         sync.ShowItems.AddRange(player.Data.ShowItems);
-        await CallGSRouter.SendScript(connection, "PlayerSetting_ChangeShowCard", "{}", sync);
+        return Task.FromResult(CallGSResult.Ok("{}", sync));
     }
 }
 
-internal sealed class ChangeShowCardParam
+public sealed class ChangeShowCardParam
 {
     [JsonPropertyName("nID")]
     public uint Id { get; set; }

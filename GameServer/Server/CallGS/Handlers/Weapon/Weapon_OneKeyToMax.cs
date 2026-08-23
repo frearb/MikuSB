@@ -8,32 +8,29 @@ using System.Text.Json.Serialization;
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Weapon;
 
 [CallGSApi("Weapon_OneKeyToMax")]
-public class Weapon_OneKeyToMax : ICallGSHandler
+public class Weapon_OneKeyToMax : CallGSHandler<OneKeyToMaxParam>
 {
     private const uint MaxBreak = 6;
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, OneKeyToMaxParam req)
     {
-        var player = connection.Player!;
-        var req = JsonSerializer.Deserialize<OneKeyToMaxParam>(param);
+        var player = context.Connection.Player!;
+
         if (req == null || req.Id <= 0 || req.TbBreakUpgradeMat == null || req.TbBreakUpgradeMat.Count == 0)
         {
-            await CallGSRouter.SendScript(connection, "Weapon_OneKeyToMax", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var weapon = player.InventoryManager.GetWeaponItem((uint)req.Id);
         if (weapon == null)
         {
-            await CallGSRouter.SendScript(connection, "Weapon_OneKeyToMax", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var config = WeaponUpgradeConfig.Load();
         if (!config.TryGetWeaponTemplate(weapon.TemplateId, out var targetTemplate))
         {
-            await CallGSRouter.SendScript(connection, "Weapon_OneKeyToMax", "{\"sErr\":\"error.BadParam\"}");
-            return;
+            return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
         var inventory = player.InventoryManager.InventoryData;
@@ -58,22 +55,19 @@ public class Weapon_OneKeyToMax : ICallGSHandler
 
                 if (itemId == weapon.UniqueId)
                 {
-                    await CallGSRouter.SendScript(connection, "Weapon_OneKeyToMax", "{\"sErr\":\"tip.material_not_enough\"}");
-                    return;
+                    return Task.FromResult(CallGSResult.Error("tip.material_not_enough"));
                 }
 
                 var material = FindInventoryItem(inventory, itemId);
                 if (material == null || material.ItemCount < count)
                 {
-                    await CallGSRouter.SendScript(connection, "Weapon_OneKeyToMax", "{\"sErr\":\"tip.material_not_enough\"}");
-                    return;
+                    return Task.FromResult(CallGSResult.Error("tip.material_not_enough"));
                 }
 
                 if (material is GameWeaponInfo materialWeapon &&
                     (materialWeapon.EquipAvatarId != 0 || equippedWeaponIds.Contains(materialWeapon.UniqueId)))
                 {
-                    await CallGSRouter.SendScript(connection, "Weapon_OneKeyToMax", "{\"sErr\":\"tip.material_not_enough\"}");
-                    return;
+                    return Task.FromResult(CallGSResult.Error("tip.material_not_enough"));
                 }
             }
         }
@@ -153,8 +147,7 @@ public class Weapon_OneKeyToMax : ICallGSHandler
         var sync = new NtfSyncPlayer();
         sync.Items.AddRange(syncItems);
 
-        await CallGSRouter.SendScript(connection, "Weapon_OneKeyToMax",
-            $"{{\"bMaxUnLock\":{(bMaxUnlock ? "true" : "false")}}}", sync);
+        return Task.FromResult(CallGSResult.Ok($"{{\"bMaxUnLock\":{(bMaxUnlock ? "true" : "false")}}}", sync));
     }
 
     private static BaseGameItemInfo? FindInventoryItem(InventoryData inventory, uint itemId)
@@ -173,7 +166,7 @@ public class Weapon_OneKeyToMax : ICallGSHandler
     }
 }
 
-internal sealed class OneKeyToMaxParam
+public sealed class OneKeyToMaxParam
 {
     [JsonPropertyName("Id")]
     public int Id { get; set; }

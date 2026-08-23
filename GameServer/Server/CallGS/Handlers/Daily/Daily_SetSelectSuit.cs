@@ -3,23 +3,22 @@
 namespace MikuSB.GameServer.Server.CallGS.Handlers.Daily;
 
 [CallGSApi("Daily_SetSelectSuit")]
-public class Daily_SetSelectSuit : ICallGSHandler
+public class Daily_SetSelectSuit : CallGSHandler<GirlWeaponSkinParam>
 {
 
-    public async Task Handle(Connection connection, string param, ushort seqNo)
+    protected override Task<CallGSResult> HandleAsync(CallGSContext context, GirlWeaponSkinParam req)
     {
-        var req = JsonSerializer.Deserialize<GirlWeaponSkinParam>(param);
+
         if (req == null)
         {
-            await CallGSRouter.SendScript(connection, "Daily_SetSelectSuit", "{}");
-            return;
+            return Task.FromResult(CallGSResult.Ok("{}"));
         }
         var rsp = $"{{\"SuitId\":{req.Suit}}}";
-        await CallGSRouter.SendScript(connection, "Daily_SetSelectSuit", rsp);
+        return Task.FromResult(CallGSResult.Ok(rsp));
     }
 }
 
-internal sealed class GirlWeaponSkinParam
+public sealed class GirlWeaponSkinParam
 {
     public uint Type { get; set; }
     public uint Suit { get; set; }

@@ -1,5 +1,4 @@
 using MikuSB.Database;
-using MikuSB.Database.Player;
 using MikuSB.Proto;
 
 namespace MikuSB.GameServer.Server.Packet.Recv.Login;
@@ -11,22 +10,7 @@ public class HandlerNtfSetAttr : Handler
     {
         var req = NtfSetAttr.Parser.ParseFrom(data);
         var player = connection.Player!;
-        var attr = player.Data.Attrs
-            .FirstOrDefault(x => x.Gid == req.Gid && x.Sid == req.Sid);
-
-        if (attr != null)
-        {
-            attr.Val = req.Val;
-        }
-        else
-        {
-            player.Data.Attrs.Add(new PlayerAttr
-            {
-                Gid = req.Gid,
-                Sid = req.Sid,
-                Val = req.Val
-            });
-        }
+        player.Attributes.Set(req.Gid, req.Sid, req.Val);
         DatabaseHelper.SaveDatabaseType(player.Data);
         await player.OnHeartBeat();
     }
