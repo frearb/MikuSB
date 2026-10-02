@@ -41,14 +41,15 @@ public class SocketListener
 
     private static async Task AcceptLoop()
     {
-        if (serverSocket == null)
-            throw new InvalidOperationException("Server socket not initialized.");
+        var listener = serverSocket;
+        if (listener == null)
+            return;
 
         try
         {
             while (true)
             {
-                Socket clientSocket = await serverSocket.AcceptAsync();
+                Socket clientSocket = await listener.AcceptAsync();
                 var remote = clientSocket.RemoteEndPoint as IPEndPoint;
 
                 if (remote == null)
@@ -85,6 +86,15 @@ public class SocketListener
         {
             Logger.Info("Server stopped listening.");
         }
+        catch (SocketException) when (serverSocket == null)
+        {
+            Logger.Info("Server stopped listening.");
+        }
+    }
+
+    public static void StopListener()
+    {
+        Interlocked.Exchange(ref serverSocket, null)?.Dispose();
     }
 
     public static SocketConnection? GetConnectionByEndPoint(IPEndPoint ep)

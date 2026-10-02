@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+.gitattributes text eol=lf
+.editorconfig text eol=lf
+*.cs text eol=crlf
+*.md text eol=crlf

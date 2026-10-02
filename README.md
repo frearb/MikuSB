@@ -51,6 +51,22 @@ dotnet build
 4. Create an account in the server console.  
 5. Enjoy.
 
+### Start the server and game together (Sunshine)
+
+Run `MikuSB.exe --play` to start the server, wait for initialization, then launch
+the configured game with DLL injection. When the game exits, the server saves
+the database and exits. Ctrl+C stops the game and shuts down the server.
+Additional arguments after `--play` are forwarded to the game.
+
+This mode uses `Config/Config.json` relative to the executable directory and
+skips the interactive server self-update check. Do not run another server
+instance on the same ports at the same time.
+
+In Sunshine, set **Command** to the full quoted path to `MikuSB.exe` followed by
+`--play`, and **Working Directory** to the directory containing `MikuSB.exe`.
+Leave **Detached Commands** empty so the main command stays running for the
+duration of the game session.
+
 ## Feature List
 
 * [x] Login and basic account entry

@@ -3,6 +3,9 @@
 # IDE0022: 使用方法的程序块主体
 csharp_style_expression_bodied_methods = false:silent
 
+[*.md]
+end_of_line = crlf
+
 [*.cs]
 #### 命名样式 ####
 

@@ -1,4 +1,4 @@
-﻿using MikuSB.Data;
+using MikuSB.Data;
 using MikuSB.Database;
 using MikuSB.MikuSB.Tool;
 using MikuSB.GameServer.Command;
@@ -8,6 +8,7 @@ using MikuSB.MikuSB.Update;
 using MikuSB.TcpSharp;
 using MikuSB.Util;
 using System.Globalization;
+using MikuSB.Loader;
 
 namespace MikuSB.MikuSB.Program;
 
@@ -22,46 +23,62 @@ public class MikuSB
     private static readonly CancellationTokenSource _cts = new();
     private static int _exitCode = 0;
 
-    public static async Task Main()
+    public static async Task Main(string[] args)
     {
+        var play = args.Length > 0 && args[0].Equals("--play", StringComparison.OrdinalIgnoreCase);
+        if (play)
+            Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+
         var time = DateTime.Now;
         IConsole.InitConsole();
-        LoaderManager.InitConfig();
-        ShowAntiScamWarning();
-        if (await UpdateService.TryStartSelfUpdateAsync())
-            return;
-
         RegisterExitEvent();
-        await LoaderManager.InitSdkServer();
-        LoaderManager.InitPacket();
-
-        LoaderManager.InitDatabase();
-        if (!DatabaseHelper.LoadAllData)
+        try
         {
-            var t = Task.Run(() =>
+            LoaderManager.InitConfig();
+            ShowAntiScamWarning();
+            if (!play && await UpdateService.TryStartSelfUpdateAsync())
+                return;
+
+            await LoaderManager.InitSdkServer();
+            LoaderManager.InitPacket();
+
+            await LoaderManager.InitDatabase(_cts.Token);
+
+            Logger.Warn(I18NManager.Translate("Server.ServerInfo.WaitForAllDone"));
+
+            await LoaderManager.InitResource();
+            ResourceManager.IsLoaded = true;
+
+            HandbookGenerator.GenerateAll();
+            // Register commands before launching, including the optional in-game console bridge.
+            await LoaderManager.InitCommand(_cts.Token, listenConsole: false);
+
+            var elapsed = DateTime.Now - time;
+            Logger.Info(I18NManager.Translate("Server.ServerInfo.ServerStarted",
+                Math.Round(elapsed.TotalSeconds, 2).ToString(CultureInfo.InvariantCulture)));
+
+            if (play)
             {
-                while (!DatabaseHelper.LoadAllData) // wait for all data to be loaded
-                    Thread.Sleep(100);
-            });
-
-            await t.WaitAsync(new CancellationToken());
-
-            Logger.Info(I18NManager.Translate("Server.ServerInfo.LoadedItem", I18NManager.Translate("Word.Database")));
+                _cts.Token.ThrowIfCancellationRequested();
+                var pid = GameLaunchService.Launch(args.Skip(1).ToArray());
+                Logger.Info($"Game started (PID {pid}). The server will stop when the game exits.");
+                await GameSession.WaitForExitAsync(pid, _cts.Token);
+                Logger.Info("Game exited. Saving data and stopping the server.");
+                RequestShutdown(0);
+            }
+            else
+            {
+                await IConsole.ListenConsole(_cts.Token);
+            }
         }
-
-        Logger.Warn(I18NManager.Translate("Server.ServerInfo.WaitForAllDone"));
-
-        await LoaderManager.InitResource();
-        ResourceManager.IsLoaded = true;
-
-        HandbookGenerator.GenerateAll();
-        var consoleTask = Task.Run(() => LoaderManager.InitCommand(_cts.Token), _cts.Token);
-
-        var elapsed = DateTime.Now - time;
-        Logger.Info(I18NManager.Translate("Server.ServerInfo.ServerStarted",
-            Math.Round(elapsed.TotalSeconds, 2).ToString(CultureInfo.InvariantCulture)));
-
-        await consoleTask;
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Server or game startup failed.", ex);
+            RequestShutdown(1);
+        }
 
         await ProcessExit(Volatile.Read(ref _exitCode));
     }
@@ -109,12 +126,23 @@ public class MikuSB
 
     private static async Task ProcessExit(int exitCode)
     {
+        SocketListener.StopListener();
+        try
+        {
+            await SdkServer.SdkServer.StopAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Failed to stop HTTP/proxy services.", ex);
+            exitCode = 1;
+        }
         SocketListener.Connections.Values.ToList().ForEach(x => x.Stop(true));
 
         DatabaseHelper.Stop();          // notify stop
         await DatabaseHelper.WaitAsync(); // wait AutoSave thread exit
 
-        DatabaseHelper.SaveDatabase(); // final flush
+        if (DatabaseHelper.LoadAllData)
+            DatabaseHelper.SaveDatabase(); // final flush
 
         Environment.Exit(exitCode);
     }

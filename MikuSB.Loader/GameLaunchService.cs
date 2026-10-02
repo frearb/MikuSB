@@ -60,6 +60,12 @@ public static class GameLaunchService
 
                 return processInfo.dwProcessId;
             }
+            catch
+            {
+                // Do not leave a suspended game behind when injection or resume fails.
+                TerminateProcess(processInfo.hProcess, 1);
+                throw;
+            }
             finally
             {
                 CloseHandle(processInfo.hThread);
@@ -282,6 +288,9 @@ public static class GameLaunchService
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern uint ResumeThread(IntPtr hThread);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateProcess(IntPtr hProcess, uint exitCode);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr hObject);

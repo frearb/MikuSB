@@ -13,6 +13,14 @@ public class Logger(string moduleName)
     {
         lock (_lock)
         {
+            if (Console.IsInputRedirected || Console.IsOutputRedirected)
+            {
+                var plainMessage = $"[{DateTime.Now:HH:mm:ss}] [{ModuleName}] [{level}] {message}";
+                Console.WriteLine(plainMessage);
+                WriteToFile(plainMessage);
+                return;
+            }
+
             var savedInput = IConsole.Input.ToList(); // Copy
             IConsole.RedrawInput("", false);
             AnsiConsole.MarkupLine($"[[[bold deepskyblue3_1]{DateTime.Now:HH:mm:ss}[/]]] " +

@@ -15,7 +15,9 @@ namespace MikuSB.SdkServer;
 
 public static class SdkServer
 {
-    public static void Start(string[] args)
+    private static IHost? _host;
+
+    public static async Task StartAsync(string[] args)
     {
         var builder = Host.CreateDefaultBuilder(args)
             .ConfigureWebHostDefaults(webBuilder =>
@@ -43,8 +45,25 @@ public static class SdkServer
                     });
             });
 
-        var host = builder.Build();
-        host.RunAsync();
+        _host = builder.Build();
+        await _host.StartAsync();
+    }
+
+    public static async Task StopAsync()
+    {
+        if (_host is null)
+            return;
+
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await _host.StopAsync(timeout.Token);
+        }
+        finally
+        {
+            _host.Dispose();
+            _host = null;
+        }
     }
 }
 
