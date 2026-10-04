@@ -57,6 +57,11 @@ public class Gacha_Launch : CallGSHandler<GachaLaunchParam>
             return CallGSResult.Error("error.BadParam");
         }
 
+        if (!GachaCost.TrySelect(gachaCfg, req.NTime, player.InventoryManager.InventoryData, out var cost))
+        {
+            return CallGSResult.Error("tip.material_not_enough");
+        }
+
         var pityState = LoadPityState(player, gachaCfg);
         var upSelectState = LoadUpSelectState(player, gachaCfg);
         var config = BuildRuntimeConfig(gachaCfg, poolNames);
@@ -124,7 +129,22 @@ public class Gacha_Launch : CallGSHandler<GachaLaunchParam>
             UpdatePityState(pityState, config, item);
             UpdateUpSelectState(upSelectState, config, item);
 
-            var itemType = (ItemTypeEnum)g;
+        }
+
+        if (awards.Count != req.NTime)
+        {
+            return CallGSResult.Error("error.BadParam");
+        }
+
+        GachaCost.Consume(player.InventoryManager.InventoryData, cost!, syncItems);
+
+        for (int i = 0; i < awards.Count; i++)
+        {
+            var award = awards[i];
+            var itemType = (ItemTypeEnum)award[0];
+            var d = award[1];
+            var p = award[2];
+            var l = award[3];
             switch (itemType)
             {
                 case ItemTypeEnum.TYPE_CARD:
@@ -136,7 +156,7 @@ public class Gacha_Launch : CallGSHandler<GachaLaunchParam>
                         if (charInfo != null)
                         {
                             syncItems.Add(charInfo.ToProto());
-                            tbNew.Add(awards.Count);
+                            tbNew.Add(i + 1);
                         }
                     }
                     break;
@@ -154,11 +174,6 @@ public class Gacha_Launch : CallGSHandler<GachaLaunchParam>
                     break;
                 }
             }
-        }
-
-        if (awards.Count == 0)
-        {
-            return CallGSResult.Error("error.BadParam");
         }
 
         SavePityState(player, gachaCfg, pityState, awards.Count, sync);

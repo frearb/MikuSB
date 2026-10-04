@@ -12,6 +12,9 @@ public class GachaExcel : ExcelResource
     public List<string>? Pool { get; set; }
     public uint Probability { get; set; }
     public uint ProbabilityTen { get; set; }
+    public JToken? CastOne { get; set; }
+    public JToken? CastTen { get; set; }
+    public JToken? CastSpecial { get; set; }
     public JToken? ProtectNum { get; set; }
     public JToken? UpNum { get; set; }
     public uint? ProtectTag { get; set; }
