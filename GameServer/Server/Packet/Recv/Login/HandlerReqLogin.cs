@@ -5,6 +5,7 @@ using MikuSB.Database.Player;
 using MikuSB.GameServer.Game.Player;
 using MikuSB.GameServer.Game.Support;
 using MikuSB.GameServer.Server.CallGS;
+using MikuSB.GameServer.Server.CallGS.Handlers.Gacha;
 using MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 using MikuSB.GameServer.Server.Packet.Send.Friend;
 using MikuSB.GameServer.Server.Packet.Send.Login;
@@ -90,6 +91,7 @@ public class HandlerReqLogin : Handler
         if (splitSupportCards)
             await SendSupportCardsOnLogin(connection);
         await connection.SendPacket(new PacketNtfCallScript(connection.Player!));
+        await CallGSRouter.SendScript(connection, "Gacha_GetOpenTime", Gacha_GetOpenTime.BuildResponse());
         await SendDebugLoginState(connection);
 
         await connection.Player.OnHeartBeat();

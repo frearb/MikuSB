@@ -12,8 +12,6 @@ namespace MikuSB.GameServer.Server.CallGS.Handlers.Girl;
 [CallGSApi("GirlCard_UpdateLevel")]
 public class GirlCard_UpdateLevel : CallGSHandler<GirlCardUpdateLevelParam>
 {
-    private const uint CashGroupId = AttrIds.CurrencyGid;
-    private static readonly uint SilverSid = AttrIds.Currency.GetSid(AttrIds.Currency.Silver);
     private const uint RoleMaxLevel = 80;
 
     protected override Task<CallGSResult> HandleAsync(CallGSContext context, GirlCardUpdateLevelParam req)
@@ -82,11 +80,14 @@ public class GirlCard_UpdateLevel : CallGSHandler<GirlCardUpdateLevelParam>
             totalSilverCost += (ulong)supplies.ConsumeGold * count;
         }
 
-        var silverAttr = player.Attributes.GetOrCreate(CashGroupId, SilverSid);
-        if ((ulong)silverAttr.Val < totalSilverCost)
+        if ((ulong)player.GetCurrencyBalance(AttrIds.Currency.Silver) < totalSilverCost)
         {
             return Task.FromResult(CallGSResult.Error("tip.material_not_enough"));
         }
+
+        var sync = new NtfSyncPlayer();
+        if (!player.TrySpendCurrency(AttrIds.Currency.Silver, checked((uint)totalSilverCost), sync))
+            return Task.FromResult(CallGSResult.Error("tip.material_not_enough"));
 
         var syncItems = new List<Item>();
         foreach (var (itemId, count) in requestedMaterials)
@@ -105,8 +106,6 @@ public class GirlCard_UpdateLevel : CallGSHandler<GirlCardUpdateLevelParam>
             }
         }
 
-        silverAttr.Val -= checked((uint)totalSilverCost);
-
         var (newLevel, newExp) = ApplyCardExp(card.Level, card.Exp, totalExp, levelCap);
         card.Level = newLevel;
         card.Exp = checked((int)newExp);
@@ -116,9 +115,7 @@ public class GirlCard_UpdateLevel : CallGSHandler<GirlCardUpdateLevelParam>
         DatabaseHelper.SaveDatabaseType(player.CharacterManager.CharacterData);
         DatabaseHelper.SaveDatabaseType(player.Data);
 
-        var sync = new NtfSyncPlayer();
         sync.Items.AddRange(syncItems);
-        player.Attributes.SyncTo(sync, silverAttr);
 
         return Task.FromResult(CallGSResult.Ok("null", sync));
     }

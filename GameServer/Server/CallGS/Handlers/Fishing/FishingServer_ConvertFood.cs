@@ -16,7 +16,6 @@ namespace MikuSB.GameServer.Server.CallGS.Handlers.Fishing;
 public class FishingServer_ConvertFood : CallGSHandler<FishingConvertFoodParam>
 {
     private const uint FishingGroupId = AttrIds.Fishing.Gid;
-    private const uint CashGroupId = AttrIds.CurrencyGid;
     private const uint FoodBaseSid = AttrIds.Fishing.FoodBaseSid;
     private const uint FoodAvaTimeSubType = 1;
     private const uint ExploreAvaTimeSubType = 2;
@@ -39,13 +38,14 @@ public class FishingServer_ConvertFood : CallGSHandler<FishingConvertFoodParam>
         var sync = new NtfSyncPlayer();
 
         if (!HasEnoughMaterials(player.InventoryManager.InventoryData, food.NeedItem, count) ||
-            !HasEnoughCash(player.Attributes, food.BaitNum, count))
+            !HasEnoughCash(player, food.BaitNum, count))
         {
             return CallGSResult.Ok("{\"sError\":\"tip.girlcard_cmd_err\"}");
         }
 
+        if (!ConsumeCash(player, food.BaitNum, count, sync))
+            return CallGSResult.Ok("{\"sError\":\"tip.girlcard_cmd_err\"}");
         ConsumeMaterials(player.InventoryManager.InventoryData, food.NeedItem, count, sync.Items);
-        ConsumeCash(player, food.BaitNum, count, sync);
 
         var response = new JsonObject
         {
@@ -116,28 +116,24 @@ public class FishingServer_ConvertFood : CallGSHandler<FishingConvertFoodParam>
         }
     }
 
-    private static bool HasEnoughCash(PlayerAttributes attributes, IReadOnlyList<uint> baitNum, uint multiplier)
+    private static bool HasEnoughCash(PlayerInstance player, IReadOnlyList<uint> baitNum, uint multiplier)
     {
         if (baitNum.Count < 2)
             return true;
 
         var moneyType = baitNum[0];
         var need = checked(baitNum[1] * multiplier);
-        var sid = AttrIds.Currency.GetSid(moneyType);
-        return attributes.GetValue(CashGroupId, sid) >= need;
+        return player.GetCurrencyBalance(moneyType) >= need;
     }
 
-    private static void ConsumeCash(MikuSB.GameServer.Game.Player.PlayerInstance player, IReadOnlyList<uint> baitNum, uint multiplier, NtfSyncPlayer sync)
+    private static bool ConsumeCash(PlayerInstance player, IReadOnlyList<uint> baitNum, uint multiplier, NtfSyncPlayer sync)
     {
         if (baitNum.Count < 2)
-            return;
+            return true;
 
         var moneyType = baitNum[0];
-        var sid = AttrIds.Currency.GetSid(moneyType);
         var need = checked(baitNum[1] * multiplier);
-        var attr = player.Attributes.GetOrCreate(CashGroupId, sid);
-        attr.Val -= need;
-        player.Attributes.SyncTo(sync, attr);
+        return player.TrySpendCurrency(moneyType, need, sync);
     }
 
     private static void ApplyFoodDuration(MikuSB.GameServer.Game.Player.PlayerInstance player, FishingFoodExcel food, uint subType, uint count, NtfSyncPlayer sync)

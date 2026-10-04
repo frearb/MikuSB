@@ -19,7 +19,6 @@ public class IBLogic_BuyGoods : CallGSHandler<IbBuyGoodsParam>
 {
     private const uint BuyGroupId = AttrIds.Shop.PurchaseGid;
     private const uint RedGroupId = AttrIds.Shop.RedDotGid;
-    private const uint CashGroupId = AttrIds.CurrencyGid;
     private const uint BattlePassGroupId = AttrIds.BattlePass.Gid;
     private const uint BattlePassCurIdSid = AttrIds.BattlePass.CurrentIdSid;
     private const uint BattlePassStatusSid = AttrIds.BattlePass.StatusSid;
@@ -354,15 +353,7 @@ public class IBLogic_BuyGoods : CallGSHandler<IbBuyGoodsParam>
             return false;
 
         var amount = checked(otherItem.Param1 * count);
-        var sid = AttrIds.Currency.GetSid(moneyType);
-        var attr = player.Attributes.GetOrCreate(CashGroupId, sid);
-        attr.Val += amount;
-        player.Attributes.SyncTo(sync, attr);
-        if (moneyType == AttrIds.Currency.Money)
-        {
-            foreach (var (key, value) in player.BuildMoneySync())
-                sync.Money[key] = value;
-        }
+        player.AddCurrency(moneyType, amount, sync);
         return true;
     }
 

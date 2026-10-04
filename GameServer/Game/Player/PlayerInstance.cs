@@ -109,6 +109,7 @@ public class PlayerInstance(PlayerGameData data)
         RewardManager = new RewardManager(this);
         RikiManager = new RikiManager(this);
         Rogue3DManager = new Rogue3DManager(this);
+        SyncItemCurrenciesToAttributes();
 
         await Task.CompletedTask;
     }
@@ -404,6 +405,29 @@ public class PlayerInstance(PlayerGameData data)
             return;
         }
 
+        var currencyTemplateId = GetCurrencyItemTemplateId(moneyType);
+        if (currencyTemplateId != 0)
+        {
+            var inventory = InventoryManager.InventoryData;
+            var item = inventory.Items.Values.FirstOrDefault(x => x.TemplateId == currencyTemplateId);
+            if (item == null)
+            {
+                item = new BaseGameItemInfo
+                {
+                    TemplateId = currencyTemplateId,
+                    UniqueId = inventory.NextUniqueUid++,
+                    ItemType = ItemTypeEnum.TYPE_USEABLE
+                };
+                inventory.Items[item.UniqueId] = item;
+            }
+
+            item.ItemCount += Math.Min(uint.MaxValue - item.ItemCount, amount);
+            sync.Items.Add(item.ToProto());
+            var currencyAttr = Attributes.Set(AttrIds.Currency.GroupId, AttrIds.Currency.GetSid(moneyType), GetCurrencyBalance(moneyType));
+            Attributes.SyncTo(sync, currencyAttr);
+            return;
+        }
+
         var sid = AttrIds.Currency.GetSid(moneyType);
         var attr = Attributes.Add(AttrIds.Currency.GroupId, sid, amount);
         Attributes.SyncTo(sync, attr);
@@ -413,6 +437,71 @@ public class PlayerInstance(PlayerGameData data)
                 sync.Money[key] = value;
         }
     }
+
+    public uint GetCurrencyBalance(uint moneyType)
+    {
+        var templateId = GetCurrencyItemTemplateId(moneyType);
+        if (templateId == 0)
+            return Attributes.GetValue(AttrIds.Currency.GroupId, AttrIds.Currency.GetSid(moneyType));
+
+        var count = InventoryManager.InventoryData.Items.Values
+            .Where(item => item.TemplateId == templateId)
+            .Aggregate(0UL, (total, item) => total + item.ItemCount);
+        return (uint)Math.Min(count, uint.MaxValue);
+    }
+
+    public bool TrySpendCurrency(uint moneyType, uint amount, NtfSyncPlayer sync)
+    {
+        if (GetCurrencyBalance(moneyType) < amount)
+            return false;
+
+        var templateId = GetCurrencyItemTemplateId(moneyType);
+        if (templateId != 0)
+        {
+            var inventory = InventoryManager.InventoryData;
+            var remaining = amount;
+            foreach (var item in inventory.Items.Values.Where(x => x.TemplateId == templateId).ToList())
+            {
+                if (remaining == 0)
+                    break;
+
+                var consumed = Math.Min(remaining, item.ItemCount);
+                item.ItemCount -= consumed;
+                remaining -= consumed;
+                if (item.ItemCount == 0)
+                    inventory.Items.Remove(item.UniqueId);
+
+                sync.Items.Add(item.ToProto());
+            }
+
+            var currencyAttr = Attributes.Set(AttrIds.Currency.GroupId, AttrIds.Currency.GetSid(moneyType), GetCurrencyBalance(moneyType));
+            Attributes.SyncTo(sync, currencyAttr);
+            return true;
+        }
+
+        var attr = Attributes.GetOrCreate(AttrIds.Currency.GroupId, AttrIds.Currency.GetSid(moneyType));
+        attr.Val -= amount;
+        Attributes.SyncTo(sync, attr);
+        if (moneyType == AttrIds.Currency.Money)
+        {
+            foreach (var (key, value) in BuildMoneySync())
+                sync.Money[key] = value;
+        }
+        return true;
+    }
+
+    private void SyncItemCurrenciesToAttributes()
+    {
+        foreach (var moneyType in new[] { AttrIds.Currency.Gold, AttrIds.Currency.Silver })
+            Attributes.Set(AttrIds.Currency.GroupId, AttrIds.Currency.GetSid(moneyType), GetCurrencyBalance(moneyType));
+    }
+
+    private static ulong GetCurrencyItemTemplateId(uint moneyType) => moneyType switch
+    {
+        AttrIds.Currency.Gold => GameResourceTemplateId.FromGdpl((uint)ItemTypeEnum.TYPE_USEABLE, 3, 2, 1),
+        AttrIds.Currency.Silver => GameResourceTemplateId.FromGdpl((uint)ItemTypeEnum.TYPE_USEABLE, 3, 1, 1),
+        _ => 0
+    };
 
     private uint GetAttrValue(uint gid, uint sid)
     {
@@ -584,7 +673,11 @@ public class PlayerInstance(PlayerGameData data)
         // Cash.GetMoneyCount uses group 1 with sid = moneyId * 2 + 1 for most currencies.
         // Fill a wide currency id range so every in-game currency starts effectively unlimited.
         for (uint moneyId = 1; moneyId <= 200; moneyId++)
+        {
+            if (moneyId is AttrIds.Currency.Gold or AttrIds.Currency.Silver)
+                continue;
             yield return (1, moneyId * 2 + 1, 999_999);
+        }
 
         for (uint guideId = 1; guideId <= 150; guideId++)
             yield return (4, guideId, 999);
