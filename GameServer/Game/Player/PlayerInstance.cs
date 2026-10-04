@@ -25,6 +25,9 @@ namespace MikuSB.GameServer.Game.Player;
 
 public class PlayerInstance(PlayerGameData data)
 {
+    private static readonly bool EnableLoginAutoGrantSupplies = false;
+    private const uint LoginAutoGrantSuppliesCount = 100;
+
     #region Property
     public Connection? Connection { get; set; }
 
@@ -82,11 +85,6 @@ public class PlayerInstance(PlayerGameData data)
             {
                 await CharacterManager.AddCharacter((ItemTypeEnum)card.Genre, card.Detail, card.Particular, card.Level, sendPacket:false);
             }
-            foreach (var supplies in GameData.AllSuppliesData)
-            {
-                await InventoryManager.AddSuppliesItem(supplies, 90000, false);
-            }
-
             var selected = CharacterManager.CharacterData.Characters
                 .OrderBy(_ => Guid.NewGuid())
                 .Take(3)
@@ -129,18 +127,19 @@ public class PlayerInstance(PlayerGameData data)
         Data.EnsureDisplayName();
         await CharacterManager.RepairCharacterWeapons();
         await EnsureSkins();
+        if (EnableLoginAutoGrantSupplies)
+            await GrantLoginSupplies();
         EnsureFashionRikiUnlocks();
-        await EnsureSupplies();
     }
 
     public IEnumerable<BaseGameItemInfo> GetSupplyItems() =>
         InventoryManager.InventoryData.Items.Values.Where(x => (x.TemplateId & 0xFFFF) == 5);
 
-    private async ValueTask EnsureSupplies()
+    private async ValueTask GrantLoginSupplies()
     {
         foreach (var supplies in GameData.AllSuppliesData)
         {
-            await InventoryManager.AddSuppliesItem(supplies, 90000, false);
+            await InventoryManager.AddSuppliesItem(supplies, LoginAutoGrantSuppliesCount, false);
         }
     }
 

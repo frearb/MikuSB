@@ -10,6 +10,7 @@ public class WeaponExcel : ExcelResource
     public uint Detail { get; set; }
     public uint Particular { get; set; }
     public uint Level { get; set; }
+    [JsonProperty("Close")] public JToken? CloseRaw { get; set; }
     [JsonProperty("Color")] public JToken? ColorRaw { get; set; }
     [JsonProperty("InitBreak")] public JToken? InitBreakRaw { get; set; }
     public int Class { get; set; }
@@ -27,6 +28,7 @@ public class WeaponExcel : ExcelResource
     public string I18n { get; set; } = "";
 
     [JsonIgnore] public int Color => ReadInt(ColorRaw);
+    [JsonIgnore] public bool IsClosed => ReadInt(CloseRaw) == 1;
     [JsonIgnore] public uint InitBreak => ReadUInt(InitBreakRaw);
     [JsonIgnore] public uint ProvideExp => ReadUInt(ProvideExpRaw);
     [JsonIgnore] public uint ConsumeGold => ReadUInt(ConsumeGoldRaw);

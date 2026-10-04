@@ -4,6 +4,7 @@ using MikuSB.Database;
 using MikuSB.Database.Inventory;
 using MikuSB.Database.Player;
 using MikuSB.Enums.Item;
+using MikuSB.GameServer.Game.Inventory;
 using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using System.Globalization;
@@ -308,6 +309,9 @@ public class IBLogic_BuyGoods : CallGSHandler<IbBuyGoodsParam>
 
     private static BaseGameItemInfo? AddOtherItem(InventoryData inventory, uint genre, uint detail, uint particular, uint level, uint count)
     {
+        if (ItemGrantBlacklist.IsBlocked(genre, detail, particular, level))
+            return null;
+
         var templateId = GameResourceTemplateId.FromGdpl(genre, detail, particular, level);
         if (!GameData.OtherItemData.TryGetValue(templateId, out var otherItem))
             return null;

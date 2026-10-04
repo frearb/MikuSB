@@ -17,7 +17,7 @@ public class InventoryManager(PlayerInstance player) : BasePlayerManager(player)
     {
         if (genre != ItemTypeEnum.TYPE_WEAPON) return null;
         var weaponData = GameData.WeaponData.Values.FirstOrDefault(x => x.Genre == (int)genre && x.Detail == detail && x.Particular == particular && x.Level == level);
-        if (weaponData == null) return null;
+        if (weaponData == null || weaponData.IsClosed) return null;
 
         var templateId = GameResourceTemplateId.FromGdpl((uint)genre,detail,particular,level);
         var weaponInfo = new GameWeaponInfo
@@ -128,7 +128,7 @@ public class InventoryManager(PlayerInstance player) : BasePlayerManager(player)
     {
         const ItemTypeEnum genre = ItemTypeEnum.TYPE_SUPPORT;
         var spCard = GameData.SupportCardData.FirstOrDefault(x => x.Genre == (int)genre && x.Detail == detail && x.Particular == particular && x.Level == level);
-        if (spCard == null) return null;
+        if (spCard == null || spCard.IsClosed) return null;
         var templateId = GameResourceTemplateId.FromGdpl((uint)genre, detail, particular, level);
         cardLevel = Math.Clamp(cardLevel, 1, spCard.MaxLevel);
         var info = new GameSupportCardInfo
@@ -236,6 +236,9 @@ public class InventoryManager(PlayerInstance player) : BasePlayerManager(player)
 
     public async ValueTask<BaseGameItemInfo?> AddSuppliesItem(SuppliesExcel suppliesData, uint count, bool sendPacket = true)
     {
+        if (suppliesData.IsClosed || ItemGrantBlacklist.IsBlocked(suppliesData.Genre, suppliesData.Detail, suppliesData.Particular, suppliesData.Level))
+            return null;
+
         var templateId = GameResourceTemplateId.FromGdpl(suppliesData.Genre, suppliesData.Detail, suppliesData.Particular, suppliesData.Level);
 
         uint maxCount = GetSuppliesMaxCount(suppliesData);
@@ -268,6 +271,9 @@ public class InventoryManager(PlayerInstance player) : BasePlayerManager(player)
             return null;
 
         var templateId = GameResourceTemplateId.FromGdpl((uint)genre, detail, particular, level);
+        if (ItemGrantBlacklist.IsBlocked((uint)genre, detail, particular, level))
+            return null;
+
         if (!GameData.OtherItemData.TryGetValue(templateId, out var otherItem))
             return null;
 
@@ -383,7 +389,7 @@ public class InventoryManager(PlayerInstance player) : BasePlayerManager(player)
     {
         if (genre != ItemTypeEnum.TYPE_WEAPON_PART) return null;
         var weaponPartData = GameData.WeaponPartsData.Values.FirstOrDefault(x => x.Genre == (int)genre && x.Detail == detail && x.Particular == particular && x.Level == level);
-        if (weaponPartData == null) return null;
+        if (weaponPartData == null || weaponPartData.IsClosed) return null;
         var templateId = GameResourceTemplateId.FromGdpl((uint)genre, detail, particular, level);
         if (InventoryData.Items.Values.Any(x => x.TemplateId == templateId)) return null;
         var weaponPartInfo = new BaseGameItemInfo

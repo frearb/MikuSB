@@ -369,5 +369,8 @@ FodyWeavers.xsd
 /GameServer/OriginalProto
 *.rar
 /Lua_Script
+/Client_Settings
 /.note
 /Snowbreak_Data
+
+/AGENTS.md

@@ -54,7 +54,7 @@ public class SupportCardExcel : ExcelResource
         GameData.SupportCardData.Add(this);
     }
 
-    private bool IsClosed => Close switch
+    [JsonIgnore] public bool IsClosed => Close switch
     {
         null => false,
         JValue { Type: JTokenType.Integer } value => value.Value<int>() != 0,

@@ -3,6 +3,7 @@ using MikuSB.Data.Excel;
 using MikuSB.Database;
 using MikuSB.Database.Inventory;
 using MikuSB.Enums.Item;
+using MikuSB.GameServer.Game.Inventory;
 using MikuSB.GameServer.Game.Player;
 using MikuSB.Proto;
 using System.Text.Json;
@@ -189,6 +190,9 @@ public class FishingServer_ConvertFood : CallGSHandler<FishingConvertFoodParam>
 
     private static BaseGameItemInfo? AddOtherItem(InventoryData inventory, uint detail, uint particular, uint level, uint count)
     {
+        if (ItemGrantBlacklist.IsBlocked((uint)ItemTypeEnum.TYPE_USEABLE, detail, particular, level))
+            return null;
+
         var templateId = GameResourceTemplateId.FromGdpl((uint)ItemTypeEnum.TYPE_USEABLE, detail, particular, level);
         if (!GameData.OtherItemData.TryGetValue(templateId, out var otherItem))
             return null;
