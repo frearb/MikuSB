@@ -25,7 +25,9 @@ public class Gacha_UpSelect : CallGSHandler<GachaUpSelectParam>
             return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }
 
-        if (!GameData.GachaData.TryGetValue((uint)req.NId, out var gachaCfg) || gachaCfg.UpSelect != 1)
+        if (!GameData.GachaData.TryGetValue((uint)req.NId, out var gachaCfg)
+            || !GachaRotation.IsOpen(gachaCfg, GachaRotation.Today())
+            || gachaCfg.UpSelect != 1)
         {
             return Task.FromResult(CallGSResult.Error("error.BadParam"));
         }

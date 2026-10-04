@@ -25,4 +25,9 @@
     <ProjectReference Include="..\Proto\Proto.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Server\CallGS\Handlers\Gacha\gacha_rotation.json"
+                      LogicalName="MikuSB.GachaRotation.json" />
+  </ItemGroup>
+
 </Project>

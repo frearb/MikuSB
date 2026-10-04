@@ -8,6 +8,7 @@ namespace MikuSB.Data.Excel;
 public class GachaExcel : ExcelResource
 {
     public uint ID { get; set; }
+    public uint Type { get; set; }
     public List<string>? Pool { get; set; }
     public uint Probability { get; set; }
     public uint ProbabilityTen { get; set; }

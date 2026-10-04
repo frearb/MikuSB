@@ -39,7 +39,8 @@ public class Gacha_Launch : CallGSHandler<GachaLaunchParam>
             return CallGSResult.Error("error.BadParam");
         }
 
-        if (!GameData.GachaData.TryGetValue((uint)req.NId, out var gachaCfg))
+        if (!GameData.GachaData.TryGetValue((uint)req.NId, out var gachaCfg)
+            || !GachaRotation.IsOpen(gachaCfg, GachaRotation.Today()))
         {
             return CallGSResult.Error("error.BadParam");
         }

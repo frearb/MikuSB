@@ -1,0 +1,428 @@
+[
+  {
+    "key": "card.girl042_suits",
+    "roleIds": [
+      12
+    ],
+    "weaponIds": [],
+    "day": 0
+  },
+  {
+    "key": "card.girl072_suits",
+    "roleIds": [
+      23,
+      39,
+      123,
+      139
+    ],
+    "weaponIds": [
+      24,
+      40,
+      124,
+      140
+    ],
+    "day": 0
+  },
+  {
+    "key": "card.girl103_suits",
+    "roleIds": [
+      49,
+      149
+    ],
+    "weaponIds": [
+      50,
+      150
+    ],
+    "day": 0
+  },
+  {
+    "key": "card.girl151_suits",
+    "roleIds": [
+      17,
+      117
+    ],
+    "weaponIds": [
+      18,
+      118
+    ],
+    "day": 0
+  },
+  {
+    "key": "card.girl171_suits",
+    "roleIds": [
+      15,
+      115
+    ],
+    "weaponIds": [
+      16,
+      116
+    ],
+    "day": 0
+  },
+  {
+    "key": "card.girl043_suits",
+    "roleIds": [
+      45,
+      145
+    ],
+    "weaponIds": [
+      46,
+      146
+    ],
+    "day": 1
+  },
+  {
+    "key": "card.girl112_suits",
+    "roleIds": [
+      25,
+      125
+    ],
+    "weaponIds": [
+      26,
+      126
+    ],
+    "day": 1
+  },
+  {
+    "key": "card.girl122_suits",
+    "roleIds": [
+      13,
+      113
+    ],
+    "weaponIds": [
+      14,
+      114
+    ],
+    "day": 1
+  },
+  {
+    "key": "card.girl152_suits",
+    "roleIds": [
+      41,
+      141
+    ],
+    "weaponIds": [
+      42,
+      142
+    ],
+    "day": 1
+  },
+  {
+    "key": "card.girl172_suits",
+    "roleIds": [
+      65,
+      165
+    ],
+    "weaponIds": [
+      66,
+      166
+    ],
+    "day": 1
+  },
+  {
+    "key": "card.girl053_suits",
+    "roleIds": [
+      43,
+      143
+    ],
+    "weaponIds": [
+      44,
+      144
+    ],
+    "day": 2
+  },
+  {
+    "key": "card.girl113_suits",
+    "roleIds": [
+      53,
+      71,
+      153,
+      171
+    ],
+    "weaponIds": [
+      54,
+      72,
+      154,
+      172
+    ],
+    "day": 2
+  },
+  {
+    "key": "card.girl153_suits",
+    "roleIds": [
+      63,
+      163
+    ],
+    "weaponIds": [
+      64,
+      164
+    ],
+    "day": 2
+  },
+  {
+    "key": "card.girl161_suits",
+    "roleIds": [
+      19,
+      35,
+      119,
+      135
+    ],
+    "weaponIds": [
+      20,
+      36,
+      120,
+      136
+    ],
+    "day": 2
+  },
+  {
+    "key": "card.girl181_suits",
+    "roleIds": [
+      37,
+      137
+    ],
+    "weaponIds": [
+      38,
+      138
+    ],
+    "day": 2
+  },
+  {
+    "key": "card.girl012_suits",
+    "roleIds": [
+      4,
+      21,
+      104
+    ],
+    "weaponIds": [
+      5,
+      22,
+      105
+    ],
+    "day": 3
+  },
+  {
+    "key": "card.girl054_suits",
+    "roleIds": [
+      93,
+      193
+    ],
+    "weaponIds": [
+      94,
+      194
+    ],
+    "day": 3
+  },
+  {
+    "key": "card.girl132_suits",
+    "roleIds": [
+      27,
+      127
+    ],
+    "weaponIds": [
+      28,
+      128
+    ],
+    "day": 3
+  },
+  {
+    "key": "card.girl182_suits",
+    "roleIds": [
+      59,
+      159
+    ],
+    "weaponIds": [
+      60,
+      160
+    ],
+    "day": 3
+  },
+  {
+    "key": "card.girl211_suits",
+    "roleIds": [
+      55,
+      155
+    ],
+    "weaponIds": [
+      56,
+      156
+    ],
+    "day": 3
+  },
+  {
+    "key": "card.girl013_suits",
+    "roleIds": [
+      91,
+      191
+    ],
+    "weaponIds": [
+      92,
+      192
+    ],
+    "day": 4
+  },
+  {
+    "key": "card.girl083_suits",
+    "roleIds": [
+      31,
+      131
+    ],
+    "weaponIds": [
+      32,
+      132
+    ],
+    "day": 4
+  },
+  {
+    "key": "card.girl133_suits",
+    "roleIds": [
+      81,
+      181
+    ],
+    "weaponIds": [
+      82,
+      182
+    ],
+    "day": 4
+  },
+  {
+    "key": "card.girl201_suits",
+    "roleIds": [
+      47,
+      73,
+      147,
+      173
+    ],
+    "weaponIds": [
+      48,
+      74,
+      148,
+      174
+    ],
+    "day": 4
+  },
+  {
+    "key": "card.girl221_suits",
+    "roleIds": [
+      75,
+      175
+    ],
+    "weaponIds": [
+      76,
+      176
+    ],
+    "day": 4
+  },
+  {
+    "key": "card.girl022_suits",
+    "roleIds": [
+      9
+    ],
+    "weaponIds": [],
+    "day": 5
+  },
+  {
+    "key": "card.girl084_suits",
+    "roleIds": [
+      79,
+      179
+    ],
+    "weaponIds": [
+      80,
+      180
+    ],
+    "day": 5
+  },
+  {
+    "key": "card.girl142_suits",
+    "roleIds": [
+      7,
+      107
+    ],
+    "weaponIds": [
+      8,
+      108
+    ],
+    "day": 5
+  },
+  {
+    "key": "card.girl202_suits",
+    "roleIds": [
+      89,
+      189
+    ],
+    "weaponIds": [
+      90,
+      190
+    ],
+    "day": 5
+  },
+  {
+    "key": "card.girl231_suits",
+    "roleIds": [
+      87,
+      187
+    ],
+    "weaponIds": [
+      88,
+      188
+    ],
+    "day": 5
+  },
+  {
+    "key": "card.girl023_suits",
+    "roleIds": [
+      29,
+      129
+    ],
+    "weaponIds": [
+      30,
+      130
+    ],
+    "day": 6
+  },
+  {
+    "key": "card.girl062_suits",
+    "roleIds": [
+      10,
+      110
+    ],
+    "weaponIds": [
+      11,
+      111
+    ],
+    "day": 6
+  },
+  {
+    "key": "card.girl102_suits",
+    "roleIds": [
+      6
+    ],
+    "weaponIds": [],
+    "day": 6
+  },
+  {
+    "key": "card.girl143_suits",
+    "roleIds": [
+      51,
+      151
+    ],
+    "weaponIds": [
+      52,
+      152
+    ],
+    "day": 6
+  },
+  {
+    "key": "card.girl241_suits",
+    "roleIds": [
+      99,
+      199
+    ],
+    "weaponIds": [
+      100,
+      200
+    ],
+    "day": 6
+  }
+]

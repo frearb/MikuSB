@@ -1,5 +1,7 @@
 ﻿using MikuSB.Enums.Packet;
 using MikuSB.GameServer.Game.Player;
+using MikuSB.GameServer.Server.CallGS;
+using MikuSB.GameServer.Server.CallGS.Handlers.Gacha;
 using MikuSB.GameServer.Server.Packet;
 using MikuSB.TcpSharp;
 using MikuSB.Util;
@@ -14,6 +16,18 @@ public class Connection(Socket socket, IPEndPoint remote) : SocketConnection(soc
     private static readonly Logger Logger = new("GameServer");
 
     public PlayerInstance? Player { get; set; }
+    private DateOnly? _lastGachaOpenTimeDate;
+
+    public async Task SendGachaOpenTimeIfNeeded()
+    {
+        if (Player == null)
+            return;
+        var today = GachaRotation.Today();
+        if (_lastGachaOpenTimeDate == today)
+            return;
+        await CallGSRouter.SendScript(this, "Gacha_GetOpenTime", Gacha_GetOpenTime.BuildResponse(today));
+        _lastGachaOpenTimeDate = today;
+    }
 
     private static readonly HashSet<string> DummyPacketNames =
     [
@@ -93,6 +107,7 @@ public class Connection(Socket socket, IPEndPoint remote) : SocketConnection(soc
 
     private async Task HandlePacket(ushort opcode, byte[] payload)
     {
+        await SendGachaOpenTimeIfNeeded();
         var packetName = LogMap.GetValueOrDefault(opcode);
         if (DummyPacketNames.Contains(packetName!))
         {
