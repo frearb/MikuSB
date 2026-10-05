@@ -131,6 +131,7 @@ public class PlayerInstance(PlayerGameData data)
         if (EnableLoginAutoGrantSupplies)
             await GrantLoginSupplies();
         EnsureFashionRikiUnlocks();
+        House.HouseDailyEventService.Refresh(this);
     }
 
     public IEnumerable<BaseGameItemInfo> GetSupplyItems() =>

@@ -64,6 +64,8 @@ public class ServerOption
     public bool EnableGmMenu { get; set; } = false;
     public bool AutoCreateUser { get; set; } = true;
     public bool EnableBossPvpDailyRandomBoss { get; set; } = false;
+    public bool EnableHouseDailyRandomEvent { get; set; } = true;
+    public int HouseDailyRandomEventResetHour { get; set; } = 4;
     public bool SavePersonalDebugFile { get; set; } = false;
     public bool AutoSendResponseWhenNoHandler { get; set; } = true;
 #if DEBUG

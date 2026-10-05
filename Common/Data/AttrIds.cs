@@ -540,6 +540,9 @@ public static class AttrIds
     public static class House
     {
         public const uint Gid = 101;
+        // Server-owned day marker; separate from the client's documented house slots.
+        public const uint DailyTalkRefreshDaySid = 65000;
+        public const uint DailyTalkGirlSid = 2601;
         public const uint TaskGuideGroupId = 175;
         public const uint ThrowMiniGameGroupId = 170;
         public const uint BedroomStartSid = 2550;

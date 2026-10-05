@@ -107,6 +107,16 @@ public class Connection(Socket socket, IPEndPoint remote) : SocketConnection(soc
 
     private async Task HandlePacket(ushort opcode, byte[] payload)
     {
+        if (Player?.CharacterManager != null)
+        {
+            var sync = new MikuSB.Proto.NtfSyncPlayer();
+            Game.House.HouseDailyEventService.Refresh(Player, sync);
+            if (sync.Custom.Count > 0)
+            {
+                await Player.OnHeartBeat();
+                await CallGSRouter.SendScript(this, "", "{}", sync);
+            }
+        }
         await SendGachaOpenTimeIfNeeded();
         var packetName = LogMap.GetValueOrDefault(opcode);
         if (DummyPacketNames.Contains(packetName!))
