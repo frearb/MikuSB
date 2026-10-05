@@ -2,8 +2,10 @@ using MikuSB.Data;
 using MikuSB.Data.Excel;
 using MikuSB.Database.Inventory;
 using MikuSB.GameServer.Server.CallGS.Handlers.Gacha;
+using MikuSB.GameServer.Server.CallGS.Handlers.Items;
 using MikuSB.Proto;
 using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 var standard = GameResourceTemplateId.FromGdpl(5, 21, 1, 5);
 var alternative = GameResourceTemplateId.FromGdpl(5, 21, 2, 5);
@@ -64,6 +66,17 @@ Assert(GachaCost.TrySelect(permanentConfig, 1, inventory, out var permanentCost)
     "Permanent draw should accept its own ticket");
 GachaCost.Consume(inventory, permanentCost!, sync);
 Assert(!inventory.Items.ContainsKey(6), "Permanent draw must spend its ticket");
+
+var exchangePath = Path.GetFullPath("MikuSB/bin/Debug/net10.0/Resources/item/exchange.json");
+var exchanges = JsonConvert.DeserializeObject<List<ItemExchangeExcel>>(File.ReadAllText(exchangePath))!;
+foreach (var exchange in exchanges) exchange.Loaded();
+Assert(exchanges.Count == 4 && GameData.ItemExchangeData.Count == 4,
+    "All four gacha ticket exchange rules must load");
+Assert(exchanges.All(x => x.Cash.SequenceEqual([2u, 160u]) && x.Item.Count == 0),
+    "Each ticket should cost 160 data gold");
+var purchase = System.Text.Json.JsonSerializer.Deserialize<ItemExchangeParam>("{\"tbGDPLN\":[5,21,1,5,6]}")!;
+Assert(purchase.TbGDPLN!.SequenceEqual([5u, 21u, 1u, 5u, 6u]),
+    "The handler must accept the request shape captured in Server.log");
 
 Console.WriteLine("Gacha cost checks passed.");
 

@@ -2,7 +2,6 @@ using MikuSB.GameServer.Game.Player;
 using MikuSB.TcpSharp;
 using MikuSB.Proto;
 using MikuSB.Util;
-using MikuSB.Util.Extensions;
 
 namespace MikuSB.GameServer.Server.Packet.Send.Login;
 
@@ -20,10 +19,13 @@ public class PacketRspLogin : BasePacket
         var attrCount = player.Attributes.All.Count;
         var strAttrCount = player.Attributes.AllStrings.Count;
         var showItemCount = player.Data.ShowItems.Count;
+        var serverNow = DateTimeOffset.Now;
 
         var proto = new RspLogin
         {
-            Timestamp = (uint)Extensions.GetUnixSec(),
+            Timestamp = (uint)serverNow.ToUnixTimeSeconds(),
+            // The client interprets this field as whole hours and multiplies it by 3600.
+            TimeZone = (int)serverNow.Offset.TotalHours,
             WorldChannel = 1,
             AreaId = 1,
             Data = player.ToPlayerProto(includeSupportCards),
