@@ -93,7 +93,7 @@ public class Gacha_Launch : CallGSHandler<GachaLaunchParam>
             }
             else
             {
-                var rarity = RollRarity(probCfg);
+                var rarity = RollRarity(probCfg, useTenGuarantee);
                 item = forceTopUp && config.UpTarget != null && rarity >= config.TopRarity
                     ? PickGuaranteedItem(gachaCfg, config, preferUp: true)
                     : PickItem(allPoolItems, rarity);
@@ -422,9 +422,9 @@ public class Gacha_Launch : CallGSHandler<GachaLaunchParam>
         GameData.GachaPoolData.TryGetValue(target.PoolName, out var pool) &&
         pool.Any(x => x.ID == item.ID);
 
-    private static int RollRarity(GachaProbabilityExcel prob)
+    private static int RollRarity(GachaProbabilityExcel prob, bool useTenGuarantee)
     {
-        var weights = prob.Weights;
+        var weights = GachaProbabilityCorrection.GetWeights(prob, useTenGuarantee);
         int total = weights.Sum();
         int roll = Rng.Next(total);
         int cumulative = 0;
