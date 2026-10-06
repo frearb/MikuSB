@@ -217,8 +217,19 @@ public class PlayerInstance(PlayerGameData data)
     #region Actions
     public async ValueTask OnHeartBeat()
     {
+        var exchangeSync = new NtfSyncPlayer();
+        bool exchangeReset;
+        lock (Data)
+            exchangeReset = CashExchangeService.Refresh(Attributes, DateTimeOffset.UtcNow, exchangeSync);
         DatabaseHelper.ToSaveUidList.SafeAdd(Uid);
-        await Task.CompletedTask;
+        if (exchangeReset && Connection != null)
+        {
+            // This registered callback accepts an empty argument and applies ExtraSync.
+            await SendPacket(CmdIds.NtfScript, new NtfCallScript
+            {
+                Api = "House_Request", Arg = "{}", ExtraSync = exchangeSync
+            });
+        }
     }
 
     public async ValueTask ReceiveMessage(uint sendUid, uint recvUid, string? message = null, uint? emojiId = null)
@@ -267,6 +278,8 @@ public class PlayerInstance(PlayerGameData data)
 
     public Proto.Player ToPlayerProto(bool includeSupportCards = true)
     {
+        lock (Data)
+            CashExchangeService.Refresh(Attributes, DateTimeOffset.UtcNow);
         BuildPlayerAttr();
         BuildPlayerStrAttr();
         var displayName = PlayerGameData.NormalizeDisplayName(Data.Name);

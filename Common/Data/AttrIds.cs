@@ -26,6 +26,7 @@ public static class AttrIds
         public const uint GroupId = 70;
         public const uint VigorLimitSid = 1;
         public const uint SilverLimitSid = 2;
+        public const uint RefreshDaySid = 100;
     }
 
     public static class Achievement

@@ -11,6 +11,10 @@ public class HandlerNtfSetAttr : Handler
     {
         var req = NtfSetAttr.Parser.ParseFrom(data);
         var player = connection.Player!;
+        // Exchange counters and their reset marker are owned by the server.
+        if (req.Gid == AttrIds.CashExchange.GroupId && req.Sid is
+            AttrIds.CashExchange.VigorLimitSid or AttrIds.CashExchange.SilverLimitSid or AttrIds.CashExchange.RefreshDaySid)
+            return;
         var viewed = req.Gid == AttrIds.House.Gid &&
             (req.Sid >= AttrIds.House.SuitViewedStartSid && req.Sid < AttrIds.House.SuitViewedEndSid ||
              req.Sid == AttrIds.House.RingViewedSid || req.Sid == AttrIds.House.GirlRingViewedSid ||
