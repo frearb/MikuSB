@@ -13,23 +13,24 @@ public class Logger(string moduleName)
     {
         lock (_lock)
         {
+            var now = DateTime.Now;
+            var fileMessage = $"[{now:yyyy-MM-dd HH:mm:ss}] [{ModuleName}] [{level}] {message}";
             if (Console.IsInputRedirected || Console.IsOutputRedirected)
             {
-                var plainMessage = $"[{DateTime.Now:HH:mm:ss}] [{ModuleName}] [{level}] {message}";
+                var plainMessage = $"[{now:HH:mm:ss}] [{ModuleName}] [{level}] {message}";
                 Console.WriteLine(plainMessage);
-                WriteToFile(plainMessage);
+                WriteToFile(fileMessage);
                 return;
             }
 
             var savedInput = IConsole.Input.ToList(); // Copy
             IConsole.RedrawInput("", false);
-            AnsiConsole.MarkupLine($"[[[bold deepskyblue3_1]{DateTime.Now:HH:mm:ss}[/]]] " +
+            AnsiConsole.MarkupLine($"[[[bold deepskyblue3_1]{now:HH:mm:ss}[/]]] " +
                                $"[[[gray]{ModuleName}[/]]] [[[{(ConsoleColor)level}]{level}[/]]] " +
                                $"{message.Replace("[", "[[").Replace("]", "]]")}");
             IConsole.RedrawInput(savedInput);
 
-            var logMessage = $"[{DateTime.Now:HH:mm:ss}] [{ModuleName}] [{level}] {message}";
-            WriteToFile(logMessage);
+            WriteToFile(fileMessage);
         }
     }
 

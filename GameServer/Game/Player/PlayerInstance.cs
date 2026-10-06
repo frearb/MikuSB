@@ -132,6 +132,7 @@ public class PlayerInstance(PlayerGameData data)
             await GrantLoginSupplies();
         EnsureFashionRikiUnlocks();
         House.HouseDailyEventService.Refresh(this);
+        House.HousePuzzleService.EnsureAvailable(Attributes, DateTimeOffset.UtcNow);
     }
 
     public IEnumerable<BaseGameItemInfo> GetSupplyItems() =>

@@ -26,6 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Game\House\puzzle_config.json" LogicalName="MikuSB.HousePuzzle.json" />
     <EmbeddedResource Include="Server\CallGS\Handlers\Gacha\gacha_rotation.json"
                       LogicalName="MikuSB.GachaRotation.json" />
   </ItemGroup>

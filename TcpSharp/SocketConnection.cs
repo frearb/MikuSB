@@ -94,9 +94,12 @@ public class SocketConnection
             //Logger.DebugWriteLine($"{sendOrRecv}: {Enum.GetName(typeof(OpCode), opcode)}({opcode})\r\n{Convert.ToHexString(payload)}");
             if (IgnoreLog.Contains(opcode)) return;
             if (!ConfigManager.Config.ServerOption.DebugDetailMessage) throw new Exception(); // go to catch block
+            // The opcode is NtfScript, but the protobuf is NtfCallScript.
+            // Resolve the alias so detailed logs include callback args and ExtraSync.
+            var messageName = opcode == CmdIds.NtfScript ? nameof(NtfCallScript) : LogMap[opcode];
             var typ = AppDomain.CurrentDomain.GetAssemblies()
                 .SingleOrDefault(assembly => assembly.GetName().Name == "MikuProto")!.GetTypes()
-                .First(t => t.Name == $"{LogMap[opcode]}"); //get the type using the packet name
+                .First(t => t.Name == messageName);
             var descriptor =
                 typ.GetProperty("Descriptor", BindingFlags.Public | BindingFlags.Static)?.GetValue(
                     null, null) as MessageDescriptor; // get the static property Descriptor

@@ -26,29 +26,7 @@ public class LoaderManager : MikuSB
         var logFile = new FileInfo(Path.Combine(logDir, "Server.log"));
         logFile.Directory?.Create();
 
-        if (logFile.Exists)
-        {
-            // Read start time from first log line, fall back to file creation time
-            DateTime logStartTime;
-            try
-            {
-                var firstLine = File.ReadLines(logFile.FullName).FirstOrDefault() ?? "";
-                // Format: [HH:mm:ss] ...
-                var timeStr = firstLine.Length >= 10 ? firstLine[1..9] : "";
-                var dateStr = logFile.CreationTime.ToString("yyyy-MM-dd");
-                logStartTime = DateTime.TryParse($"{dateStr} {timeStr}", out var parsed)
-                    ? parsed
-                    : logFile.CreationTime;
-            }
-            catch
-            {
-                logStartTime = logFile.CreationTime;
-            }
-
-            var backupName = $"Server-backup-{logStartTime:yyyy.MM.dd-HH.mm.ss}.log";
-            var backupFile = new FileInfo(Path.Combine(logDir, backupName));
-            logFile.MoveTo(backupFile.FullName, overwrite: true);
-        }
+        ServerLogRotation.Archive(logFile);
 
         Logger.SetLogFile(new FileInfo(Path.Combine(logDir, "Server.log")));
 
